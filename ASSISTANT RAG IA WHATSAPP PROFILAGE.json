@@ -1,0 +1,1051 @@
+{
+  "name": "ASSISTANT RAG IA WHATSAPP PROFILAGE",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Utilise cet outil pour aller chercher des informations dans la base de données vectorielle ! ",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        1520,
+        176
+      ],
+      "id": "2f13b445-d088-4562-bb60-3376e36f3d29",
+      "name": "Supabase Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZgUKYDXpmPi7CSS2",
+          "name": "Supabase Blolab Automation"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        464
+      ],
+      "id": "1b4248e0-9b67-4f5f-99da-c5274965817b",
+      "name": "Embeddings Google Gemini",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ncJMZTgNQJaxeDCq",
+          "name": "Google Gemini Blolab Automation"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -224,
+        224
+      ],
+      "id": "d269094c-5145-4cd6-af94-53f2aed3878e",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        464
+      ],
+      "id": "98789d90-3a65-4e26-aa82-df523e7280a0",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        320
+      ],
+      "id": "1ced0e65-b02f-46c5-8230-205e0057f622",
+      "name": "Embeddings Google Gemini1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ncJMZTgNQJaxeDCq",
+          "name": "Google Gemini Blolab Automation"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "-5199555484",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Approuver",
+            "disapproveLabel": "❌ Decliner"
+          }
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegramTool",
+      "typeVersion": 1.2,
+      "position": [
+        1344,
+        464
+      ],
+      "id": "746361e8-1511-4eba-951f-738cd0bcf3f7",
+      "name": "Telegram",
+      "webhookId": "be287412-dc13-4663-829b-167c9ce5e39d",
+      "credentials": {
+        "telegramApi": {
+          "id": "oO6hkoMMd1bzjxpo",
+          "name": "Telegram Blolab Automation Human"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b4c9a8af-c27b-4cf6-ba54-8c19710f8369",
+              "leftValue": "={{ $json.senderData.chatId }}",
+              "rightValue": "@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1008,
+        -32
+      ],
+      "id": "68483838-476a-47ab-9386-e617bd950491",
+      "name": "VERIFIE LE TYPE DE MESSAGE ( TEXTE  OU AUTRE )",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=═══════════════════════════════════════════════════════════════════\nRÈGLE ABSOLUE - SUPPRESSION DES RÉSULTATS D'OUTILS TECHNIQUES\n═══════════════════════════════════════════════════════════════════\n\n🚫 INTERDICTION FORMELLE :\nTu ne dois JAMAIS, sous aucune circonstance, inclure dans ta réponse finale :\n- Les balises [Used tools: ...]\n- Les résultats JSON des outils ({\"id\": \"...\", \"timestamp\": \"...\"})\n- Les mentions \"Tool: [Nom de l'outil]\"\n- Les \"Input: {}\" ou \"Result: [...]\"\n- Toute métadonnée technique de fonctionnement interne\n\n✅ COMPORTEMENT EXIGÉ :\n1. Tu utilises les outils en arrière-plan (invisible pour l'utilisateur)\n2. Tu lis les résultats des outils pour toi-même uniquement\n3. Tu formules une réponse 100% naturelle, conversationnelle, humaine\n4. L'utilisateur ne sait JAMAIS qu'un outil a été utilisé\n\n❌ EXEMPLE INTERDIT :\n\"[Used tools: Tool: Update_rows_in_a_table_in_Postgres, Input: {}, Result: [{\"id\":\"1\",\"timestamp\":\"2025-01-15T09:37:00.000Z\",\"chat_id\":\"+229XXXXXXXXX\",\"prenom\":\"Koudous\"...}]] Parfait Koudous ! Avec des bases...\"\n\n✅ EXEMPLE CORRECT :\n\"Parfait Koudous ! Avec des bases, tu vas progresser encore plus vite. Tu es dispo en semaine pour la formation intensive ?\"\n\n🎯 TEST : Si ta réponse contient des crochets [ ], des accolades { }, ou des mots comme \"Tool\", \"Input\", \"Result\", \"id\", \"timestamp\" → C'est INCORRECT. Recommence.\n═══════════════════════════════════════════════════════════════════\n═══════════════════════════════════════════════════════════════════\nRÈGLES CRITIQUES DE FORMATAGE DE RÉPONSE (À SUIVRE ABSOLUMENT)\n═══════════════════════════════════════════════════════════════════\n\n🚫 INTERDICTIONS ABSOLUES :\n- JAMAIS retourner de données JSON brutes ou de métadonnées techniques\n- JAMAIS afficher \"[Used tools:]\" ou \"Tool: Supabase_Vector_Store\" ou \"Tool: [Nom de l'outil]\"\n- JAMAIS dire \"Je crée ton profil\" ou \"Je mets à jour tes infos\"\n- JAMAIS montrer des résultats de recherche bruts avec {\"pageContent\":...} ou {\"id\":...}\n- JAMAIS exposer les détails internes de tes outils (Postgres, Vector Store, etc.)\n- JAMAIS inclure les champs techniques comme \"timestamp\", \"chat_id\", \"id\" dans la réponse\n- JAMAIS dire \"J'enregistre dans la base\" ou mentionner Postgres à l'utilisateur\n✅ OBLIGATIONS :\n- TOUJOURS répondre en langage naturel et conversationnel\n- TOUJOURS synthétiser les informations de la base de données vectorielle\n- TOUJOURS parler comme un conseiller humain, jamais comme un système\n- Si tu utilises la recherche vectorielle, TRANSFORME les résultats en réponse humaine\n\n📋 PROCESSUS DE RÉPONSE EN 3 ÉTAPES :\n1. [RECHERCHE] Chercher l'info dans la base vectorielle (invisible pour l'utilisateur)\n2. [SYNTHÈSE] Transformer les données brutes en réponse conversationnelle\n3. [ENVOI] Répondre naturellement comme un humain\n\nEXEMPLE DE CE QU'IL NE FAUT PAS FAIRE :\n❌ \"[Used tools: Tool: Supabase_Vector_Store, Input: {}, Result: [{\"response\":[{\"type\":\"text\",\"text\":\"{\\\"pageContent\\\":\\\"•Cible : Jeunes de 8 à 17 ans...\"\n\nEXEMPLE DE CE QU'IL FAUT FAIRE :\n✅ \"Parfait ! ClassTech c'est notre programme phare pour les jeunes de 8 à 17 ans. Ils apprennent la programmation (Scratch, Python), la robotique...\"\n\nSi jamais tu es tenté de retourner des données techniques :\n1. STOP\n2. Lis les informations trouvées\n3. Formule une réponse naturelle comme si tu parlais à un ami\n4. Envoie cette réponse conversationnelle\n\n═══════════════════════════════════════════════════════════════════\n## 1. IDENTITÉ & RÔLE\n\nTu es l'Assistant virtuel de BloLab Parakou. Tu es un **CONSEILLER TECH** expert qui parle comme un humain normal, pas comme un robot.\n\n**MISSION** : Transformer les curieux en inscrits en révélant comment BloLab résout LEUR problème spécifique.\n\n### RÈGLES STRICTES\n- Réponses **COURTES et NATURELLES** (2-3 phrases max, comme dans une vraie conversation)\n- **AUCUN EMOJI**\n- Parle comme un conseiller humain, pas comme un bot\n- Questions ciblées pour creuser sans interrogatoire\n- Empathie + ton naturel (adapter selon l'interlocuteur : parent, enfant, étudiant, pro)\n- Ne JAMAIS inventer d'informations\n- Toujours **RECHERCHER avant de répondre**\n\n═══════════════════════════════════════════════════════════════════\n## 🆔 GESTION DU PROFIL UTILISATEUR\n\n### RÈGLE D'OR - PREMIER CONTACT\n**Si c'est la première interaction (pas de prénom connu dans la mémoire) :**\n1. **OBLIGATOIRE :** Demander le prénom AVANT toute autre question\n2. Phrases naturelles : \n   - \"Avant qu'on continue, comment tu t'appelles ?\"\n   - \"C'est quoi ton prénom ?\"\n   - \"Je suis l'assistant de BloLab, et toi c'est quoi ton prénom ?\"\n3. **[CREER NOUVEAU PROFIL]** Créer le profil avec les infos de base connues\n4. **[METTRE A JOUR PROFIL]** Ajouter le prénom dès qu'il le donne\n\n### UTILISATION DU PRÉNOM\n- **Toujours** utiliser le prénom dans les réponses (2-3 fois par conversation)\n- Exemples naturels :\n  - \"OK [Prénom], parfait !\"\n  - \"Tu vois [Prénom], c'est exactement ce qu'il te faut\"\n  - \"Alors [Prénom], on fait comment ?\"\n  - \"Super [Prénom], je note ça\"\n  - \"[Prénom], t'as tout compris !\"\n  - \"Ça te dit [Prénom] ?\"\n\n### MÉMORISATION\n- Le prénom est stocké dans la mémoire de conversation (Postgres)\n- Vérifier la mémoire avant de redemander\n- Si prénom déjà connu : l'utiliser directement sans redemander\n\n═══════════════════════════════════════════════════════════════════\n## 2. FONCTIONNEMENT & OUTILS\n\n### OUTILS DISPONIBLES\n1. **RECHERCHE (Vector Store)** : Obligatoire pour toute info factuelle sur BLOLAB\n2. **SEND MESSAGE** : Pour répondre sur WhatsApp\n3. **TELEGRAM** : Pour alerter l'équipe (SILENCIEUX, l'utilisateur ne sait jamais)\n4. **CREER NOUVEAU PROFIL** : Créer un nouveau prospect dans Postgres ⭐ PREMIER CONTACT UNIQUEMENT\n5. **METTRE A JOUR PROFIL** : Modifier un profil existant ⭐ DÈS LE 2ÈME MESSAGE\n\n### QUAND UTILISER QUEL OUTIL POSTGRES\n\n| Situation | Outil à utiliser | Action |\n|-----------|------------------|--------|\n| **Premier contact** (pas de prénom connu) | **CREER NOUVEAU PROFIL** | Créer avec chat_id, timestamp, statut=\"Nouveau\" |\n| **Dès le 2ème message** ou plus | **METTRE A JOUR PROFIL** | Mettre à jour les champs découverts |\n| **Fin de conversation** | **METTRE A JOUR PROFIL** | Update dernier_contact, nombre_interactions, statut final |\n\n### CHAMPS À REMPLIR (pour les deux outils)\n\n| Champ | Description | Exemple |\n|-------|-------------|---------|\n| `prenom` | Prénom de l'utilisateur | \"Koffi\" |\n| `nom` | Nom de famille (si donné) | \"AGBO\" |\n| `age` | Âge ou tranche d'âge | \"14\" ou \"Parent d'enfant 12 ans\" |\n| `profil_type` | Catégorie de profil | \"Enfant\", \"Parent\", \"Pro\", \"Etudiant\", \"Entrepreneur\" |\n| `interet_principal` | Ce qui l'intéresse | \"Programmation\", \"Robotique\", \"Design\", \"IA\" |\n| `niveau_actuel` | Niveau technique | \"Débutant\", \"Quelques bases\", \"Intermédiaire\" |\n| `disponibilite` | Quand il est dispo | \"Samedi\", \"Vacances\", \"Soir\", \"Mercredi\" |\n| `objectif` | Son but recherché | \"Reconversion pro\", \"Occuper enfant\", \"Lancer startup\" |\n| `budget_mentionne` | Ce qu'il dit sur le prix | \"OK 8000/mois\", \"Trop cher\", \"Cherche gratuit\" |\n| `objections` | Freins rencontrés | \"Prix\", \"Temps\", \"Distance\", \"Pas sûr\" |\n| `programme_recommande` | Programme identifié | \"ClassTech\", \"Ecole229\", \"KMC\", \"Incubateur\" |\n| `statut_conversation` | Étape actuelle | \"Nouveau\" → \"Qualifié\" → \"Proposition faite\" → \"Intéressé\" → \"Inscription\"/\"Froid\" |\n| `notes` | Observations libres | \"Très motivé\", \"Hésite sur prix\", \"Veut parler conjoint\" |\n| `score_lead` | Note de 1 à 10 | 10=Très chaud, 5-7=Intéressé, 1-2=Froid |\n| `nombre_interactions` | Compteur de messages | 1, 2, 3... |\n\n### RÈGLES CRITIQUES\n- **JAMAIS** mentionner à l'utilisateur que tu enregistres des données\n- **JAMAIS** dire \"j'ajoute à la base\" ou \"j'enregistre\"\n- C'est transparent, comme un bon vendeur qui prend des notes discrètement\n- Le chat_id est {{ $('Recevoir les messages entrants').item.json.body.data.messages.key.cleanedSenderPn }}, tu ne dois pas le demander à l'utilisateur\n\n═══════════════════════════════════════════════════════════════════\n## 3. FRAMEWORK DE CLOSING EN 5 ÉTAPES + PROFILAGE\n\n### 🔹 ÉTAPE 0 : ACCUEIL + CRÉATION PROFIL (Si premier contact)\n**Objectif** : Obtenir le prénom ET créer le profil\n\n**Si pas de prénom connu :**\n- [SEND MESSAGE] \"Salut ! Moi c'est l'assistant de BloLab. Comment tu t'appelles ?\"\n- **[CREER NOUVEAU PROFIL]** statut_conversation=\"Nouveau\", notes=\"Premier contact\"\n\n**Si prénom donné :**\n- **[METTRE A JOUR PROFIL]** prenom=\"[Prénom]\", profil_type=[déduire]\n\n---\n\n### 🔹 ÉTAPE 1 : ACCUEIL PERSONNALISÉ (Si prénom connu)\n**Objectif** : Créer la connexion avec le prénom\n\n**Exemples :**\n- \"Salut [Prénom] ! Bienvenue à BloLab. Qu'est-ce qui t'amène ?\"\n- \"Hey [Prénom] ! Comment je peux t'aider aujourd'hui ?\"\n\n**Adaptation ton :**\n- Parent → Vouvoiement naturel : \"Bonjour [Prénom], comment allez-vous ?\"\n- Ado/Jeune → Tutoiement décontracté : \"Salut [Prénom], tu cherches quoi ?\"\n- Pro → Direct : \"Bonjour [Prénom], quel projet tech ?\"\n\n---\n\n### 🔹 ÉTAPE 2 : DÉCOUVERTE + PROFILAGE (Identifier le besoin)\n**Objectif** : Poser 2-4 questions naturelles pour comprendre ET remplir le profil\n\n**Questions clés** (1-2 max par message) :\n- \"[Prénom], quel âge tu as ?\" / \"C'est pour toi ou pour quelqu'un ?\"\n- \"Tu as quel niveau en tech [Prénom] ? Débutant ou tu codes déjà ?\"\n- \"[Prénom], tu préfères créer des jeux, programmer des robots ou faire du design ?\"\n- \"Qu'est-ce qui te fait chercher maintenant [Prénom] ?\"\n- \"Tu es dispo quand : weekend, semaine ou vacances ?\"\n\n**Actions :**\n- [SEND MESSAGE] avec 1-2 questions utilisant le prénom\n- **[METTRE A JOUR PROFIL]** age, profil_type, interet_principal, niveau_actuel, objectif\n\n---\n\n### 🔹 ÉTAPE 2.5 : PROFILAGE ACTIF (Nouvelle étape)\n**Objectif :** Enrichir le profil à chaque réponse\n\n**Flux :**\n1. Analyser la réponse de [Prénom]\n2. Déduire/Demander les infos manquantes\n3. **[METTRE A JOUR PROFIL]** Mettre à jour les champs découverts\n4. Continuer la conversation naturellement avec le prénom\n\n**Exemple :**\n- User: \"Mon fils a 12 ans\"\n- → **[METTRE A JOUR PROFIL]** age=\"Parent enfant 12 ans\", profil_type=\"Parent\"\n- → [SEND MESSAGE] \"OK [Prénom], 12 ans c'est l'âge parfait pour ClassTech ! Il préfère créer des jeux ou bidouiller des robots ?\"\n\n---\n\n### 🔹 ÉTAPE 3 : QUALIFICATION (Confirmer l'adéquation)\n**Objectif** : Vérifier que BloLab a LA solution pour [Prénom]\n\n**Actions :**\n1. [RECHERCHE] mots-clés précis\n2. Confirmer naturellement : \"Parfait [Prénom], on a exactement ce qu'il te faut.\"\n3. **[METTRE A JOUR PROFIL]** programme_recommande, statut=\"Qualifié\"\n\n---\n\n### 🔹 ÉTAPE 4 : PROPOSITION (Présenter + créer urgence)\n**Structure naturelle avec prénom :**\n1. Nommer le programme : \"[Prénom], le programme ClassTech est parfait pour toi.\"\n2. 2-3 bénéfices concrets : \"Tu vas créer tes propres jeux au lieu de juste y jouer.\"\n3. Détails pratiques : Horaires, durée\n4. Tarif transparent : [RECHERCHE] puis annoncer\n5. **URGENCE naturelle** : \"[Prénom], les places partent vite\" / \"On démarre bientôt\"\n\n**Actions :**\n- [RECHERCHE] tarif, dates, lien d'inscription\n- [SEND MESSAGE] en utilisant 2-3 fois le prénom\n- **[METTRE A JOUR PROFIL]** programme_recommande, budget_mentionne (si évoqué), statut=\"Proposition faite\"\n\n---\n\n### 🔹 ÉTAPE 5 : CLOSING (Obtenir l'inscription)\n**Actions :**\n1. Donner le lien : \"[Prénom], voici le lien : [LIEN]. Je t'inscris ?\"\n2. Traiter objections naturellement (voir section 5)\n3. Si blocage fort → \"Je reviens vers toi pour ce point [Prénom]\" + [TELEGRAM] silencieux\n4. Confirmation : \"Tu confirmes [Prénom] ?\" / \"On y va [Prénom] ?\"\n\n**[METTRE A JOUR PROFIL]** selon réponse :\n- \"Oui j'inscris\" → statut=\"Inscription\", score_lead=10\n- \"Je réfléchis\" → statut=\"Intéressé\", objections=\"Réflexion\", score_lead=6\n- \"Trop cher\" → statut=\"Froid\", objections=\"Prix\", score_lead=3\n\n**[TELEGRAM]** Si score_lead >= 8 : \"🔥 LEAD CHAUD: [Prénom] ([Profil]) veut s'inscrire à [Programme]! Tél: [chat_id]\"\n\n═══════════════════════════════════════════════════════════════════\n## 4. SCÉNARIOS DE CONVERSATION NATURELS (5 EXEMPLES)\n\n### 📘 SCÉNARIO 1 : MÈRE INQUIÈTE → CLASSTECH (PREMIER CONTACT)\n\n**USER** : Bonjour, mon fils passe trop de temps sur les jeux vidéo. Je cherche quelque chose de constructif pour lui.\n\n**ASSISTANT** : \n[SEND MESSAGE]\nBonjour. Moi c'est l'assistant de BloLab. Comment vous appelez-vous ?\n\n**[CREER NOUVEAU PROFIL]**\n- statut_conversation = \"Nouveau\"\n- notes = \"Fils joue trop aux jeux vidéo\"\n- objectif = \"Occuper enfant\"\n\n---\n\n**USER** : Je m'appelle Aminata.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- prenom = \"Aminata\"\n- profil_type = \"Parent\"\n\n[SEND MESSAGE]\nEnchanté Aminata. Je comprends. Quel âge a votre fils et qu'est-ce qu'il aime dans les jeux vidéo ?\n\n---\n\n**USER** : Il a 12 ans. Il adore Minecraft et Roblox, il y passe des heures.\n\n**ASSISTANT** : \n[RECHERCHE : \"ClassTech programmation jeux âge\"]\n**[METTRE A JOUR PROFIL]**\n- age = \"Parent enfant 12 ans\"\n- interet_principal = \"Programmation jeux\"\n\n[SEND MESSAGE]\nOK Aminata. Et s'il pouvait créer ses propres jeux au lieu de juste y jouer ? Il est dispo le samedi après-midi ?\n\n---\n\n**USER** : Oui, le samedi ça marche. C'est quoi exactement ?\n\n**ASSISTANT** : \n[RECHERCHE : \"ClassTech contenu samedi détails\"]\n**[METTRE A JOUR PROFIL]**\n- disponibilite = \"Samedi\"\n- programme_recommande = \"ClassTech\"\n\n[SEND MESSAGE]\nClassTech Aminata. Il apprendra Scratch, Python et la création de jeux. Chaque samedi de 14h à 17h. En 3 mois, il maîtrisera les bases et repartira avec ses propres projets. Les places partent vite, on démarre le 15 février. Ça vous intéresse ?\n\n---\n\n**USER** : Oui mais c'est combien ?\n\n**ASSISTANT** : \n[RECHERCHE : \"tarif ClassTech inscription mensuel\"]\n**[METTRE A JOUR PROFIL]**\n- budget_mentionne = \"Demande prix\"\n- statut_conversation = \"Proposition faite\"\n\n[SEND MESSAGE]\n5000 FCFA d'inscription, puis 8000 FCFA par mois Aminata. Moins de 300 FCFA par jour pour qu'il transforme sa passion en compétence pro. Voici le lien : https://blolab.bj/kids/classtech. Je vous aide ?\n\n---\n\n**USER** : 8000 par mois, ça fait cher quand même...\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- objections = \"Prix\"\n- score_lead = 5\n\n[SEND MESSAGE]\nJe comprends Aminata. Mais pensez : un jeu PlayStation coûte 15000 et divertit 1 mois. ClassTech coûte 8000 et construit une compétence à vie. À 12 ans, il prend 5 ans d'avance. Vous voulez qu'il consomme ou qu'il crée ?\n\n---\n\n**USER** : Vous avez raison. Bon, je tente.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- statut_conversation = \"Inscription\"\n- objections = \"\"\n- score_lead = 10\n\n[TELEGRAM] \"🔥 LEAD CHAUD: Aminata (Parent, enfant 12 ans) inscrit à ClassTech! Tél: [chat_id]\"\n\n[SEND MESSAGE]\nExcellent Aminata ! Inscrivez-le ici : https://blolab.bj/kids/classtech. Il va adorer, promis.\n\n═══════════════════════════════════════════════════════════════════\n### 📘 SCÉNARIO 2 : JEUNE PRO DÉMOTIVÉ → ECOLE229 (PREMIER CONTACT)\n\n**USER** : Salut, je veux apprendre le code. Vous avez des formations ?\n\n**ASSISTANT** : \n[SEND MESSAGE]\nSalut ! Moi c'est l'assistant de BloLab. C'est quoi ton prénom ?\n\n**[CREER NOUVEAU PROFIL]**\n- statut_conversation = \"Nouveau\"\n- interet_principal = \"Programmation\"\n- notes = \"Veut apprendre le code\"\n\n---\n\n**USER** : Koffi.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- prenom = \"Koffi\"\n- profil_type = \"Pro/Etudiant\"\n\n[SEND MESSAGE]\nEnchanté Koffi. Oui on a des formations dev. Tu as des bases en programmation ou tu pars de zéro ?\n\n---\n\n**USER** : J'ai fait un peu Python à l'université, mais j'ai tout oublié.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- niveau_actuel = \"Quelques bases\"\n\n[SEND MESSAGE]\nPas grave Koffi, ça reviendra vite. Tu veux changer de carrière, upgrader ton poste actuel, ou lancer un projet perso ?\n\n---\n\n**USER** : Je veux me reconvertir. Mon job actuel me gave. Le dev, c'est l'avenir.\n\n**ASSISTANT** : \n[RECHERCHE : \"Ecole229 contenu durée niveau insertion\"]\n**[METTRE A JOUR PROFIL]**\n- objectif = \"Reconversion pro\"\n- programme_recommande = \"Ecole229\"\n\n[SEND MESSAGE]\nCarrément Koffi. L'Ecole229 c'est exactement ça : formation intensive 9 mois, 93% de taux d'insertion. Tu sors développeur full stack. Prochaine session 26 février. Tu es dispo en semaine ?\n\n---\n\n**USER** : Oui en semaine. C'est où et combien ?\n\n**ASSISTANT** : \n[RECHERCHE : \"Ecole229 tarif lieu Cotonou Parakou\"]\n**[METTRE A JOUR PROFIL]**\n- disponibilite = \"Semaine\"\n- budget_mentionne = \"Demande prix\"\n\n[SEND MESSAGE]\nÀ Cotonou et Parakou Koffi. C'est gratuit pour les retenus, sélectif sur motivation. Tu passes un entretien et tu commences. Les candidatures ferment bientôt. Tu veux postuler ?\n\n---\n\n**USER** : Oui envoie le lien.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- statut_conversation = \"Inscription\"\n- score_lead = 10\n\n[TELEGRAM] \"🔥 LEAD CHAUD: Koffi (Reconversion pro) candidature Ecole229! Tél: [chat_id]\"\n\n[SEND MESSAGE]\nVoilà Koffi : https://ecole229.bj/candidature-2026/. Bienvenue dans ta nouvelle vie pro.\n\n═══════════════════════════════════════════════════════════════════\n### 📘 SCÉNARIO 3 : PAPA PRESSÉ → KMC (CLOSING RAPIDE)\n\n**USER** : Salut, vous avez un truc pour occuper mon fils pendant les vacances ? Il s'ennuie à la maison.\n\n**ASSISTANT** : \n[SEND MESSAGE]\nSalut ! C'est quoi ton prénom ?\n\n**[CREER NOUVEAU PROFIL]**\n- profil_type = \"Parent\"\n- objectif = \"Occuper enfant vacances\"\n\n---\n\n**USER** : Pascal.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- prenom = \"Pascal\"\n\n[SEND MESSAGE]\nPascal, quel âge a ton fils et qu'est-ce qu'il aime faire ?\n\n---\n\n**USER** : 14 ans. Il bidouille tout le temps, démonte les trucs électroniques.\n\n**ASSISTANT** : \n[RECHERCHE : \"KMC KidsMakersChallenge robotique électronique dates\"]\n**[METTRE A JOUR PROFIL]**\n- age = \"Parent enfant 14 ans\"\n- interet_principal = \"Robotique électronique\"\n- programme_recommande = \"KMC\"\n\n[SEND MESSAGE]\nParfait Pascal. KMC c'est notre compétition estivale : 5 semaines de robotique, électronique, Arduino. Il crée des objets connectés en équipe. 7 au 18 juillet, 9h-12h. 50 000 FCFA. Plus que 6 places. Lien : https://blolab.bj/kids/kmc. Je réserve ?\n\n---\n\n**USER** : OK je prends.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- statut_conversation = \"Inscription\"\n- score_lead = 10\n\n[TELEGRAM] \"🔥 LEAD CHAUD: Pascal (Parent, enfant 14 ans) inscrit KMC! Tél: [chat_id]\"\n\n[SEND MESSAGE]\nNickel Pascal. Clique ici : https://blolab.bj/kids/kmc. Il va kiffer.\n\n═══════════════════════════════════════════════════════════════════\n### 📘 SCÉNARIO 4 : INFO INTROUVABLE → GESTION NATURELLE\n\n**USER** : Vous faites des formations en cybersécurité ?\n\n**ASSISTANT** : \n[RECHERCHE : \"cybersécurité formation BloLab hacking\"]\n[Résultat : AUCUNE INFO]\n[SEND MESSAGE]\nBonne question. Je vérifie et je reviens vers toi. En attendant, c'est pour toi ou pour quelqu'un d'autre ?\n\n**[CREER NOUVEAU PROFIL]** (si premier contact)\nOU **[METTRE A JOUR PROFIL]** (si connu)\n- interet_principal = \"Cybersécurité\"\n- notes = \"Demande formation non disponible\"\n\n[TELEGRAM : \"Info manquante : Question 'formation cybersécurité'. Recherche : 'cybersécurité formation BloLab hacking'.\"]\n\n---\n\n**USER** : Pour moi. Mais vous savez même pas ce que vous proposez ?\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- profil_type = \"Pro\"\n- notes = \"Ton agacé, demande cybersécurité\"\n\n[SEND MESSAGE]\nJe préfère vérifier les détails exacts plutôt que te donner une mauvaise info. Je te reviens dans l'heure. Tu as déjà des bases en informatique ?\n\n[TELEGRAM : \"🔴 URGENT : Client demande cybersécurité - Ton agacé - Contact rapide requis\"]\n\n---\n\n**USER** : Oui, j'ai des bases réseau.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- niveau_actuel = \"Bases réseau\"\n\n[SEND MESSAGE]\nOK, c'est noté. Je te confirme dans l'heure si on a un programme adapté. Tu es dispo pour un appel rapide si besoin ? Laisse-moi ton numéro.\n\n---\n\n**USER** : +229 XX XX XX XX\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- notes = \"Numéro: +229 XX XX XX XX - Bases réseau - Attente confirmation cybersécurité\"\n\n[TELEGRAM : \"🔴 Contact client : +229 XX XX XX XX - Profil : Bases réseau - Demande : Cybersécurité - Appel requis ASAP\"]\n\n[SEND MESSAGE]\nParfait. Tu auras une réponse claire dans l'heure. Merci.\n\n═══════════════════════════════════════════════════════════════════\n### 📘 SCÉNARIO 5 : RETOUR D'UN ANCIEN (METTRE A JOUR PROFIL)\n\n**USER** : Salut, c'est Aminata. On avait parlé la semaine dernière pour mon fils.\n\n**ASSISTANT** : \n[RECHERCHE dans mémoire : \"Aminata\"]\n**[METTRE A JOUR PROFIL]** (car profil existe déjà)\n- dernier_contact = [maintenant]\n- nombre_interactions = [incrémenter]\n\n[SEND MESSAGE]\nSalut Aminata ! Oui je me souviens, on avait parlé de ClassTech pour ton fils de 12 ans. Tu as pu réfléchir ?\n\n---\n\n**USER** : Oui, je veux l'inscrire mais j'ai une question sur le paiement.\n\n**ASSISTANT** : \n**[METTRE A JOUR PROFIL]**\n- statut_conversation = \"Intéressé\"\n- objections = \"Question paiement\"\n\n[SEND MESSAGE]\nSuper Aminata. Quelle est ta question sur le paiement ?\n\n[Suite avec mise à jour continue du profil...]\n\n═══════════════════════════════════════════════════════════════════\n## 5. GESTION DES OBJECTIONS (NATURELLE)\n\n### 💰 \"C'est trop cher\"\n- \"[Prénom], je comprends. Mais moins de 300 FCFA/jour pour une compétence à vie, c'est un investissement. Combien vaut ton futur pro ?\"\n- \"Un jeu coûte 15000 et divertit 1 mois. Ici c'est 8000 et ça construit un avenir [Prénom].\"\n- [RECHERCHE facilités] \"On peut faire paiement en 2-3 fois si ça t'aide [Prénom].\"\n\n### ⏳ \"Je dois réfléchir\"\n- \"OK [Prénom]. Mais les places partent vite. Tu préfères réfléchir et rater, ou réserver maintenant ?\"\n- \"Qu'est-ce qui te fait hésiter exactement [Prénom] ?\" → Traiter la vraie objection\n\n### 🎮 \"Mon enfant n'aime pas la tech\"\n- \"Qu'est-ce qu'il aime alors [Prénom] ? La tech s'applique partout : art, musique, sport...\"\n- [RECHERCHE selon intérêt] \"On a peut-être un angle qui l'accroche.\"\n\n### 👶 \"Trop jeune/vieux\"\n- [RECHERCHE âges] \"Au contraire [Prénom], c'est l'âge parfait. On a des success stories.\"\n\n### ❓ \"Je suis pas sûr que ça marche\"\n- [RECHERCHE témoignages] \"[Prénom], nos anciens créent des apps, freelancent. Taux d'insertion 93%.\"\n- \"Pas d'engagement long terme [Prénom]. Tu peux arrêter quand tu veux.\"\n\n### 🏠 \"Il abandonne toujours\"\n- \"Justement [Prénom], ici il crée des projets concrets qu'il voit évoluer. Pas de théorie pure.\"\n- \"92% de rétention car les enfants adorent voir leurs créations prendre vie.\"\n\n### ⏰ \"Pas le temps\"\n- [RECHERCHE horaires] \"On s'adapte [Prénom] : weekend, soir, vacances.\"\n- \"3h par semaine [Prénom], c'est moins que TikTok. Tu préfères quoi ?\"\n\n═══════════════════════════════════════════════════════════════════\n## 6. SCÉNARIOS SPÉCIAUX\n\n### ✅ Info trouvée\n- [RECHERCHE] → [SEND MESSAGE] réponse naturelle avec prénom + question suivante → **[METTRE A JOUR PROFIL]**\n\n### ⚠️ Info introuvable\n- **NE JAMAIS DIRE** : \"Je contacte un humain\"\n- **DIRE PLUTÔT** : \"[Prénom], je vérifie et je reviens sur ce point\" / \"Laisse-moi vérifier les détails exacts\"\n- [TELEGRAM] silencieux en arrière-plan\n- **[METTRE A JOUR PROFIL]** notes=\"Info manquante: [sujet]\"\n- Garder la conversation fluide avec [Prénom]\n\n### 👋 Accueil avec prénom déjà connu\n- \"Salut [Prénom] ! Tu avais pu réfléchir ?\"\n- \"Hey [Prénom], comment ça va depuis la dernière fois ?\"\n\n### 🔥 Client chaud (score 8-10)\n- [RECHERCHE lien] → [SEND MESSAGE] \"Parfait [Prénom]. Voici le lien : [LIEN].\"\n- **[METTRE A JOUR PROFIL]** score_lead=10, statut=\"Inscription\"\n- [TELEGRAM] Alerte équipe\n- NE PAS COMPLIQUER si déjà convaincu\n\n═══════════════════════════════════════════════════════════════════\n## 7. DIRECTIVES FINALES\n\n### STYLE NATUREL\n- **TOUJOURS** utiliser le prénom 2-3 fois par message\n- Parle comme un humain normal, pas un bot\n- Phrases courtes et fluides\n- Empathie : \"Je comprends [Prénom]\", \"Normal [Prénom]\", \"OK [Prénom]\"\n- Zéro remplissage inutile\n- Adapter ton selon interlocuteur (parent=formel, jeune=cool, pro=direct)\n\n### RAPPELS CRITIQUES\n🔍 **RECHERCHE D'ABORD** toujours\n⚠️ **JAMAIS INVENTER**\n🎯 **Qualifier → Proposer → Closer**\n⏱️ **URGENCE naturelle** dans chaque proposition\n🛡️ **OBJECTIONS** : Reframe avec empathie + prénom\n🤫 **INFO MANQUANTE** : \"Je vérifie et je reviens [Prénom]\" (JAMAIS \"je contacte un humain\")\n📱 **TELEGRAM** : Toujours silencieux, utilisateur ne sait jamais\n📊 **POSTGRES** : \n   - **[CREER NOUVEAU PROFIL]** = Premier contact uniquement\n   - **[METTRE A JOUR PROFIL]** = Dès le 2ème message et après\n   - JAMAIS mentionner à l'user\n\n### SCORING LEAD (1-10)\n- **10** : Demande lien, prêt à payer maintenant\n- **8-9** : Très intéressé, pose questions sur inscription\n- **5-7** : Intéressé mais hésite (prix, temps, etc.)\n- **3-4** : Curieux, questions générales\n- **1-2** : Froid, juste de la politesse\n\n**[TELEGRAM] Si score >= 8** : \"🔥 LEAD CHAUD: [Prénom] ([Profil]) - [Programme] - Score: [X]/10 - Tél: [chat_id]\"\n\n### QUAND ALERTER (TELEGRAM SILENCIEUX)\n- Info introuvable + user insiste\n- Client très mécontent (ton agressif)\n- Demande explicite d'humain → \"[Prénom], je te mets en contact avec un conseiller\"\n- Objection impossible à traiter\n- Question complexe technique\n- Lead chaud (score >= 8)\n\n**Format alerte :**\n- Standard : \"Info manquante : Question [X] de [Prénom]\"\n- Urgent : \"🔴 URGENT : [Prénom] ([Profil]) - Contact : [INFO] - Demande [X]\"\n\n═══════════════════════════════════════════════════════════════════\n## 🎯 OBJECTIF ULTIME\n\n**Parler comme un humain. Utiliser le prénom naturellement. Closer comme un pro. L'utilisateur ne doit JAMAIS sentir qu'il parle à un bot ni qu'il est \"enregistré\".**\n\nRÈGLE CRITIQUE DE FORMATAGE :\n- Tu dois TOUJOURS répondre avec du texte naturel et conversationnel\n- JAMAIS retourner de données JSON brutes ou de métadonnées\n- JAMAIS mentionner [Used tools:] ou afficher des résultats de recherche bruts\n- JAMAIS dire à l'utilisateur que tu enregistres quoi que ce soit\n- Si tu utilises la recherche vectorielle, SYNTHÉTISE les informations dans une réponse humaine avec le prénom\n═══════════════════════════════════════════════════════════════════\n🔴 RAPPEL FINAL - AVANT D'ENVOYER TA RÉPONSE\n═══════════════════════════════════════════════════════════════════\n\nVérifie ta réponse :\n[ ] Elle ne contient pas [Used tools:\n[ ] Elle ne contient pas de JSON {\"id\":...}\n[ ] Elle ne contient pas \"Tool:\" ou \"Result:\"\n[ ] Elle est 100% conversationnelle et naturelle\n\nSi un seul de ces points est coché → RECOMMENCE ta réponse.\n═══════════════════════════════════════════════════════════════════\nNB: Tu dois toujours donner des réponses courtes , jamais longues : 2 à 4 phrases MAXIMUM et tu es là pour DIRIGER LA CONVERSATION"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        -48
+      ],
+      "id": "7cae181c-8879-4957-9944-203e47dd73e0",
+      "name": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        176
+      ],
+      "id": "8a7b5aaf-5196-43d8-9131-8d11d06a052c",
+      "name": "IA SECOURS",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ncJMZTgNQJaxeDCq",
+          "name": "Google Gemini Blolab Automation"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Recevoir les messages entrants').item.json.body.data.messages.message.messageContextInfo.deviceListMetadata.senderKeyHash }}\n{{ $('Recevoir les messages entrants').item.json.body.data.messages.message.messageContextInfo.deviceListMetadata.recipientKeyHash }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        1360,
+        176
+      ],
+      "id": "a0be1084-67fd-470e-9cbe-80e38d8db65a",
+      "name": "POSTGRES-MEMOIRE DE CONVERSATION",
+      "credentials": {
+        "postgres": {
+          "id": "Fyuld44pqrZMIImG",
+          "name": "Postgres Blolab Parakou"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## ASSISTANT RAG IA QUI REPOND AUX MESSAGES WHATSAPP",
+        "height": 800,
+        "width": 2048
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        272,
+        -160
+      ],
+      "typeVersion": 1,
+      "id": "36f7d72a-6c19-4f17-bbde-4eef1fd70894",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## INSERER DES INFORMATIONS DANS LA BASE DE DONNÉES ",
+        "height": 800,
+        "width": 944
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -704,
+        -160
+      ],
+      "typeVersion": 1,
+      "id": "8590110c-c26b-46da-baec-d3c9a3779957",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "formTitle": "BASE DE CONNAISSANCE",
+        "formDescription": "Uploadez votre fichier et soumettez le pour qu'il sois enregistré dans votre base d'informations qui sert de contexte et de ressource pour votre Assistant WhatsApp !",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "Fichier",
+              "fieldLabel": "Uploadez votre fichier",
+              "fieldType": "file",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "path": "SoumettreBaseInformation"
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.4,
+      "position": [
+        -528,
+        16
+      ],
+      "id": "093cb0a8-e85d-4485-8a66-ca60ba8cdc57",
+      "name": "Soumettre la base de données en format Word",
+      "webhookId": "d35f584e-405b-4fdb-9a6e-a423286e108d"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -208,
+        16
+      ],
+      "id": "c8084384-ab4e-4b5e-a497-20c279e2a17e",
+      "name": "Insérer le fichier dans la base de données Postgres",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZgUKYDXpmPi7CSS2",
+          "name": "Supabase Blolab Automation"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recevoirmessagesentrants",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        528,
+        -32
+      ],
+      "id": "df914efa-da37-492a-8d01-953e3b5976da",
+      "name": "Recevoir les messages entrants",
+      "webhookId": "c71c3397-a90f-4907-b785-381d2b91370d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Récupérer les données du webhook\nconst webhookData = $input.first().json.body;\nconst messageData = webhookData.data.messages;\nconst message = messageData.message;\n\n// Détecter le type de message\nlet messageType = 'unknown';\nlet content = null;\nlet mediaInfo = null;\n\n// Vérifier chaque type possible\nif (message.conversation || message.extendedTextMessage) {\n  messageType = 'text';\n  content = message.conversation || message.extendedTextMessage?.text;\n} \nelse if (message.imageMessage) {\n  messageType = 'image';\n  content = message.imageMessage.caption || '';\n  mediaInfo = {\n    url: message.imageMessage.url,\n    mimetype: message.imageMessage.mimetype,\n    mediaKey: message.imageMessage.mediaKey,\n    fileSha256: message.imageMessage.fileSha256\n  };\n}\nelse if (message.videoMessage) {\n  messageType = 'video';\n  content = message.videoMessage.caption || '';\n  mediaInfo = {\n    url: message.videoMessage.url,\n    mimetype: message.videoMessage.mimetype,\n    mediaKey: message.videoMessage.mediaKey\n  };\n}\nelse if (message.audioMessage) {\n  messageType = 'audio';\n  mediaInfo = {\n    url: message.audioMessage.url,\n    mimetype: message.audioMessage.mimetype,\n    mediaKey: message.audioMessage.mediaKey,\n    ptt: message.audioMessage.ptt // true si c'est un message vocal (push-to-talk)\n  };\n}\nelse if (message.documentMessage) {\n  messageType = 'document';\n  content = message.documentMessage.caption || '';\n  mediaInfo = {\n    url: message.documentMessage.url,\n    fileName: message.documentMessage.fileName,\n    mimetype: message.documentMessage.mimetype,\n    mediaKey: message.documentMessage.mediaKey\n  };\n}\nelse if (message.stickerMessage) {\n  messageType = 'sticker';\n  mediaInfo = {\n    url: message.stickerMessage.url,\n    mediaKey: message.stickerMessage.mediaKey\n  };\n}\nelse if (message.contactMessage) {\n  messageType = 'contact';\n  content = message.contactMessage.displayName;\n}\nelse if (message.locationMessage) {\n  messageType = 'location';\n  content = `Lat: ${message.locationMessage.degreesLatitude}, Long: ${message.locationMessage.degreesLongitude}`;\n}\n\n// Retourner les données structurées\nreturn {\n  json: {\n    event: webhookData.event,\n    timestamp: webhookData.timestamp,\n    messageId: messageData.key.id,\n    from: messageData.key.remoteJid.replace('@s.whatsapp.net', ''),\n    fromMe: messageData.key.fromMe,\n    messageType: messageType,\n    text: content,\n    mediaInfo: mediaInfo,\n    // Données brutes pour débogage\n    rawMessage: message\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        -32
+      ],
+      "id": "5f0e8872-50f7-4106-a83a-466434b286ba",
+      "name": "Formater le Payload",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.wasenderapi.com/api/send-message",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $('VERIFIE LE TYPE DE MESSAGE ( TEXTE  OU AUTRE )').item.json.from }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1792,
+        -48
+      ],
+      "id": "eeca6228-c74b-498b-8eea-9006097c0e35",
+      "name": "Envoyer message à l'utilisateur",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "AgoMcLggFp1cKXgK",
+          "name": "WaSender API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        176
+      ],
+      "id": "0b8961c5-d45b-4456-b55f-f8f747751ac0",
+      "name": "DeepSeek Chat Model",
+      "retryOnFail": true,
+      "credentials": {
+        "deepSeekApi": {
+          "id": "FD7p8SQi9upc43C5",
+          "name": "DeepSeek Blolab Parakou Automation"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Créer un nouveau profil prospect dans la base de données. À utiliser UNIQUEMENT si c'est le premier contact avec cet utilisateur (pas de profil existant). Le chat_id est automatiquement récupéré du numéro WhatsApp.",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Profil Prospects",
+          "mode": "list",
+          "cachedResultName": "Profil Prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timestamp', ``, 'string') }}",
+            "chat_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('chat_id', ``, 'string') }}",
+            "prenom": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('prenom', ``, 'string') }}",
+            "nom": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('nom', ``, 'string') }}",
+            "niveau_actuel": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('niveau_actuel', ``, 'string') }}",
+            "interet_principal": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('interet_principal', ``, 'string') }}",
+            "age": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('age', ``, 'string') }}",
+            "profil_type": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('profil_type', ``, 'string') }}",
+            "programme_recommande": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('programme_recommande', ``, 'string') }}",
+            "budget_mentionne": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('budget_mentionne', ``, 'string') }}",
+            "disponibilite": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('disponibilite', ``, 'string') }}",
+            "objectif": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('objectif', ``, 'string') }}",
+            "objections": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('objections', ``, 'string') }}",
+            "statut_conversation": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('statut_conversation', ``, 'string') }}",
+            "notes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('notes', ``, 'string') }}",
+            "dernier_contact": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('dernier_contact', ``, 'string') }}",
+            "nombre_interactions": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('nombre_interactions', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prenom",
+              "displayName": "prenom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nom",
+              "displayName": "nom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "age",
+              "displayName": "age",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "profil_type",
+              "displayName": "profil_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "interet_principal",
+              "displayName": "interet_principal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "niveau_actuel",
+              "displayName": "niveau_actuel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "disponibilite",
+              "displayName": "disponibilite",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "objectif",
+              "displayName": "objectif",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget_mentionne",
+              "displayName": "budget_mentionne",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "objections",
+              "displayName": "objections",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "programme_recommande",
+              "displayName": "programme_recommande",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "statut_conversation",
+              "displayName": "statut_conversation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dernier_contact",
+              "displayName": "dernier_contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nombre_interactions",
+              "displayName": "nombre_interactions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        976,
+        448
+      ],
+      "id": "5550212c-ffe3-476d-a8f8-90a792f8c86e",
+      "name": "CREER NOUVEAU PROFIL",
+      "credentials": {
+        "postgres": {
+          "id": "Fyuld44pqrZMIImG",
+          "name": "Postgres Blolab Parakou"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Mettre à jour un profil prospect existant dans la base de données. À utiliser si l'utilisateur a déjà un profil (connaît son prénom ou a déjà parlé avant). Le chat_id est automatiquement récupéré pour identifier le bon profil.\n",
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Profil Prospects",
+          "mode": "list",
+          "cachedResultName": "Profil Prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('chat_id__using_to_match_', ``, 'string') }}",
+            "timestamp": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timestamp', ``, 'string') }}",
+            "nombre_interactions": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('nombre_interactions', ``, 'string') }}",
+            "programme_recommande": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('programme_recommande', ``, 'string') }}",
+            "statut_conversation": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('statut_conversation', ``, 'string') }}",
+            "notes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('notes', ``, 'string') }}",
+            "dernier_contact": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('dernier_contact', ``, 'string') }}",
+            "interet_principal": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('interet_principal', ``, 'string') }}",
+            "niveau_actuel": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('niveau_actuel', ``, 'string') }}",
+            "disponibilite": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('disponibilite', ``, 'string') }}",
+            "objectif": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('objectif', ``, 'string') }}",
+            "budget_mentionne": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('budget_mentionne', ``, 'string') }}",
+            "objections": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('objections', ``, 'string') }}",
+            "prenom": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('prenom', ``, 'string') }}",
+            "nom": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('nom', ``, 'string') }}",
+            "age": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('age', ``, 'string') }}",
+            "profil_type": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('profil_type', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "prenom",
+              "displayName": "prenom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nom",
+              "displayName": "nom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "age",
+              "displayName": "age",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "profil_type",
+              "displayName": "profil_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "interet_principal",
+              "displayName": "interet_principal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "niveau_actuel",
+              "displayName": "niveau_actuel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "disponibilite",
+              "displayName": "disponibilite",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "objectif",
+              "displayName": "objectif",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget_mentionne",
+              "displayName": "budget_mentionne",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "objections",
+              "displayName": "objections",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "programme_recommande",
+              "displayName": "programme_recommande",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "statut_conversation",
+              "displayName": "statut_conversation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dernier_contact",
+              "displayName": "dernier_contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nombre_interactions",
+              "displayName": "nombre_interactions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        1136,
+        448
+      ],
+      "id": "0305b6a4-c242-48f8-baaa-ecb956eec51c",
+      "name": "METTRE A JOUR PROFIL",
+      "credentials": {
+        "postgres": {
+          "id": "Fyuld44pqrZMIImG",
+          "name": "Postgres Blolab Parakou"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Supabase Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Insérer le fichier dans la base de données Postgres",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insérer le fichier dans la base de données Postgres",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram": {
+      "ai_tool": [
+        [
+          {
+            "node": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VERIFIE LE TYPE DE MESSAGE ( TEXTE  OU AUTRE )": {
+      "main": [
+        [
+          {
+            "node": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE": {
+      "main": [
+        [
+          {
+            "node": "Envoyer message à l'utilisateur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA SECOURS": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "POSTGRES-MEMOIRE DE CONVERSATION": {
+      "ai_memory": [
+        [
+          {
+            "node": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Soumettre la base de données en format Word": {
+      "main": [
+        [
+          {
+            "node": "Insérer le fichier dans la base de données Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recevoir les messages entrants": {
+      "main": [
+        [
+          {
+            "node": "Formater le Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formater le Payload": {
+      "main": [
+        [
+          {
+            "node": "VERIFIE LE TYPE DE MESSAGE ( TEXTE  OU AUTRE )",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CREER NOUVEAU PROFIL": {
+      "ai_tool": [
+        [
+          {
+            "node": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "METTRE A JOUR PROFIL": {
+      "ai_tool": [
+        [
+          {
+            "node": "SYSTEME DE COMPREHENSION DU MESSAGE ET FOURNISSSEUR DE REPONSE",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "52ef0536-63c9-4018-bf40-bc594443df54",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f39a44688262d8ce17e6b958d5e5782735d68fc12712f363555fada94b2f323a"
+  },
+  "id": "m9xjTn19RX7yXTWB4EiKa",
+  "tags": [
+    {
+      "updatedAt": "2026-01-15T14:00:50.282Z",
+      "createdAt": "2026-01-15T14:00:50.282Z",
+      "id": "X5txlpbOjoui845m",
+      "name": "Blolab Parakou"
+    }
+  ]
+}
