@@ -7,6 +7,20 @@ import { BLOLAB_SYSTEM_PROMPT } from '@/lib/ai/prompts'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
 
+/** Embedding via fetch REST Gemini v1beta — évite le bug SDK qui force v1beta pour embedContent */
+async function getEmbedding(text: string): Promise<number[]> {
+    const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY!
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${key}`
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: { parts: [{ text }] } }),
+    })
+    const json = await res.json() as any
+    if (!res.ok) throw new Error(`Gemini embedding error: ${JSON.stringify(json)}`)
+    return json.embedding.values
+}
+
 export interface RAGInput {
     from: string           // Numéro WhatsApp (= chat_id dans Profil_Prospects)
     text: string
@@ -19,9 +33,7 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     const supabase = createAdminClient()
 
     // ─── [1] EMBEDDING DU MESSAGE ────────────────────────────────────
-    const embeddingModel = genAI.getGenerativeModel({ model: 'models/gemini-embedding-001' })
-    const embeddingResult = await embeddingModel.embedContent(text)
-    const queryEmbedding = embeddingResult.embedding.values
+    const queryEmbedding = await getEmbedding(text)
 
     // ─── [2] RECHERCHE VECTORIELLE (table: documents) ────────────────
     const similarityThreshold = 0.75
