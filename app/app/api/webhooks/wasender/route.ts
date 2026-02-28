@@ -7,26 +7,38 @@ import { sendWhatsAppMessage } from '@/lib/wasender/client'
 /** Valide la signature HMAC-SHA256 du webhook WaSenderAPI */
 function validateHmac(body: string, signature: string): boolean {
     const secret = process.env.WASENDER_WEBHOOK_SECRET
-    if (!secret) return false
+    if (!secret || !signature) return false
     const expected = createHmac('sha256', secret).update(body).digest('hex')
-    return signature === expected
+    // Comparaison insensible à la casse
+    return signature.toLowerCase() === expected.toLowerCase()
 }
 
 export async function POST(req: NextRequest) {
     // ─── Validation HMAC ──────────────────────────────────────────
     const rawBody = await req.text()
-    const signature = req.headers.get('x-wasender-signature') ?? ''
 
-    if (!validateHmac(rawBody, signature)) {
-        console.warn('[Webhook] Signature HMAC invalide')
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // WaSenderAPI envoie X-Webhook-Signature (pas x-wasender-signature)
+    const signature = req.headers.get('x-webhook-signature')
+        ?? req.headers.get('x-wasender-signature')
+        ?? ''
 
     let payload: any
     try {
         payload = JSON.parse(rawBody)
     } catch {
         return NextResponse.json({ error: 'Bad Request' }, { status: 400 })
+    }
+
+    // Autoriser les events de test sans vérification HMAC stricte
+    if (payload?.event !== 'webhook.test' && !validateHmac(rawBody, signature)) {
+        console.warn('[Webhook] Signature HMAC invalide', { signature: signature.slice(0, 8) + '...' })
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Event de test → répondre OK immédiatement
+    if (payload?.event === 'webhook.test') {
+        console.log('[Webhook] Test reçu ✅')
+        return NextResponse.json({ ok: true, message: 'BloLab webhook online' })
     }
 
     const event = payload?.event
