@@ -14,7 +14,7 @@ Message texte reçu (depuis Workflow 03)
 [1] Embedding du message (Gemini Embedding 001)
     │
     ▼
-[2] Recherche vectorielle pgvector (search_knowledge)
+[2] Recherche vectorielle pgvector (match_documents sur table documents)
     │
     ├── Score < seuil (0.75) → Escalade humaine
     │
@@ -29,10 +29,10 @@ Message texte reçu (depuis Workflow 03)
 [5] Appel LLM (Gemini 2.0 Flash / GPT-4o-mini fallback)
     │
     ▼
-[6] Profilage silencieux : extraction données → UPDATE contacts
+[6] Profilage silencieux : extraction données → UPSERT Profil_Prospects (chat_id)
     │
     ▼
-[7] Détection score lead → Alerte Telegram si ≥ 8
+[7] Détection score_engagement → Alerte Telegram si ≥ 80
     │
     ▼
 [8] Envoi réponse via WaSenderAPI
@@ -76,10 +76,11 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
   const queryEmbedding = embeddingResult.embedding.values
 
   // ─── [2] RECHERCHE VECTORIELLE ──────────────────────────────────
+  // Table: documents (content TEXT, metadata JSONB, embedding VECTOR)
   const similarityThreshold = 0.75
-  const { data: chunks } = await supabase.rpc('search_knowledge', {
+  const { data: chunks } = await supabase.rpc('match_documents', {
     query_embedding: queryEmbedding,
-    similarity_threshold: similarityThreshold,
+    match_threshold: similarityThreshold,
     match_count: 5,
   })
 
@@ -105,22 +106,26 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
       parts: [{ text: m.body ?? '' }],
     }))
 
-  // ─── [4] RÉCUPÉRATION PROFIL CONTACT ───────────────────────────
+  // ─── [4] RÉCUPÉRATION PROFIL PROSPECT ──────────────────────────
+  // Table: "Profil_Prospects", clé: chat_id = numéro WhatsApp
   const { data: contact } = await supabase
-    .from('contacts')
-    .select('prenom, profil_type, centre_interet, statut_lead, notes')
-    .eq('id', contactId)
+    .from('Profil_Prospects')
+    .select('prenom, profil_type, interet_principal, centres_interet, statut_conversation, etape_parcours, score_engagement, programme_recommande, objectif, notes')
+    .eq('chat_id', from)  // from = numéro WhatsApp du contact
     .single()
 
   // ─── [5] CONSTRUCTION DU PROMPT ────────────────────────────────
+  // chunks retournés par match_documents : { id, content, metadata, similarity }
   const ragContext = chunks
-    .map((c: any) => `### Source: ${c.section}\n${c.content}`)
+    .map((c: any) => `### Source: ${c.metadata?.section ?? 'BloLab'}\n${c.content}`)
     .join('\n\n')
 
   const contactContext = contact?.prenom
     ? `\n## Profil connu de ce contact\nPrénom: ${contact.prenom}` +
       (contact.profil_type ? ` | Type: ${contact.profil_type}` : '') +
-      (contact.centre_interet ? ` | Intérêt: ${contact.centre_interet}` : '')
+      (contact.interet_principal ? ` | Intérêt: ${contact.interet_principal}` : '') +
+      (contact.etape_parcours ? ` | Étape: ${contact.etape_parcours}` : '') +
+      (contact.programme_recommande ? ` | Programme recommandé: ${contact.programme_recommande}` : '')
     : ''
 
   const fullSystemPrompt =
@@ -150,25 +155,30 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
   }
 
   // ─── [7] PROFILAGE SILENCIEUX ───────────────────────────────────
+  // UPSERT dans Profil_Prospects sur chat_id (clé: numéro WhatsApp)
   const profileUpdate = await extractLeadProfile(text, aiResponse, contact)
   if (Object.keys(profileUpdate).length > 0) {
     await supabase
-      .from('contacts')
-      .update({
+      .from('Profil_Prospects')
+      .upsert({
+        chat_id: from,  // Clé unique = numéro WhatsApp
         ...profileUpdate,
-        last_contact_at: new Date().toISOString(),
-      })
-      .eq('id', contactId)
+        date_derniere_activite: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        nombre_interactions: (contact?.nombre_interactions ?? 0) + 1,
+      }, { onConflict: 'chat_id' })
   }
 
   // ─── [8] ALERTE TELEGRAM SI LEAD CHAUD ─────────────────────────
-  if (profileUpdate.score_lead && profileUpdate.score_lead >= 8) {
+  // Seuil basé sur score_engagement (0-100) au lieu de score_lead (0-10)
+  if (profileUpdate.score_engagement && profileUpdate.score_engagement >= 80) {
     await sendTelegramAlert(
       `🔥 *LEAD CHAUD*\n` +
       `Prénom: ${profileUpdate.prenom ?? contact?.prenom ?? 'Inconnu'}\n` +
       `Profil: ${profileUpdate.profil_type ?? contact?.profil_type ?? '-'}\n` +
-      `Programme: ${profileUpdate.programme_recommande ?? '-'}\n` +
-      `Score: ${profileUpdate.score_lead}/10\n` +
+      `Étape: ${profileUpdate.etape_parcours ?? '-'}\n` +
+      `Programme: ${profileUpdate.programme_recommande ?? contact?.programme_recommande ?? '-'}\n` +
+      `Score engagement: ${profileUpdate.score_engagement}/100\n` +
       `Tél: ${from}`
     )
   }
@@ -369,43 +379,95 @@ L'utilisateur ne doit JAMAIS sentir qu'il parle à un bot.
 
 ## Profilage Silencieux : `lib/ai/lead-profiler.ts`
 
+> ✅ **Interface alignée sur la vraie table `Profil_Prospects` de Supabase CoderDojo**
+
 ```typescript
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
 
-interface LeadProfileUpdate {
+/**
+ * Subset des colonnes de Profil_Prospects qui peuvent être extraites
+ * automatiquement depuis un échange WhatsApp.
+ */
+interface ProfilProspectsUpdate {
+  // Identité
   prenom?: string
   nom?: string
   age?: string
-  profil_type?: string
-  centre_interet?: string
-  niveau_actuel?: string
-  disponibilite?: string
+  telephone?: string
+  email?: string
+  ville?: string
+
+  // Persona
+  persona?: string           // Ex: 'parent_ambitieux'
+  persona_nom?: string       // Ex: 'Le Parent Ambitieux'
+  profil_type?: string       // 'Parent' | 'Enfant' | 'Etudiant' | 'Pro' | 'Entrepreneur'
+  secteur_activite?: string
+  statut_professionnel?: string
+  niveau_revenu?: string
+  taille_entreprise?: string
+
+  // Psychographie
+  ambition?: string
+  frustration_principale?: string
+  aspiration?: string
+
+  // Intérêts & Objectifs
+  interet_principal?: string
+  centres_interet?: string
   objectif?: string
+  niveau_actuel?: string     // 'Débutant' | 'Quelques bases' | 'Intermédiaire' | 'Avancé'
+  disponibilite?: string
+  equipement?: string
+
+  // Budget & Programme
   budget_mentionne?: string
+  budget_fourchette?: string
+  programme_recommande?: string  // 'ClassTech' | 'Ecole229' | 'KMC' | 'Incubateur' | 'FabLab'
+  programme_interesse?: string
+  paiement_prefere?: string
+  roi_attendu?: string
+
+  // Objections
   objections?: string
-  programme_recommande?: string
-  statut_lead?: string
-  score_lead?: number
-  notes?: string
+  objection_principale?: string
+  niveau_confiance?: string
+
+  // Statut & Parcours
+  statut_conversation?: string   // 'Nouveau' | 'Qualifie' | 'Proposition faite' | 'Interesse' | 'Inscription' | 'Froid'
+  etape_parcours?: string
+  evenement_cible?: string
+
+  // Scoring
+  score_engagement?: number      // 0 à 100
+  tendance_engagement?: string
+  niveau_urgence?: string
+  niveau_motivation?: string
+
+  // IA
+  tags_ia?: string               // JSON stringifié
+  sentiment_global?: string
+  derniere_analyse_ia?: string
+  notes_auto?: string
 }
 
 /**
  * Extrait silencieusement les données prospect depuis l'échange.
- * Appelle un LLM léger pour analyser et retourner un objet JSON.
+ * Appelle Gemini 2.0 Flash pour analyser et retourner un objet JSON.
  * L'utilisateur ne voit JAMAIS cette opération.
+ * Le résultat est ensuite upsert dans Profil_Prospects via chat_id.
  */
 export async function extractLeadProfile(
   userMessage: string,
   aiResponse: string,
   existingContact: any
-): Promise<LeadProfileUpdate> {
+): Promise<ProfilProspectsUpdate> {
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
   const prompt = `
-Tu es un système d'extraction de données. Analyse cet échange WhatsApp 
-et retourne UNIQUEMENT un objet JSON avec les données extraites.
+Tu es un système d'extraction de données CRM ultra-précis. 
+Analyse cet échange WhatsApp et retourne UNIQUEMENT un objet JSON.
 
 Profil actuel connu :
 ${JSON.stringify(existingContact ?? {}, null, 2)}
@@ -416,26 +478,32 @@ Message de l'utilisateur :
 Réponse de l'assistant :
 "${aiResponse}"
 
-Retourne un JSON avec SEULEMENT les champs qui peuvent être déduits 
-ou confirmés depuis cet échange. Omets les champs inconnus.
+Règles :
+- Retourne SEULEMENT les champs qu'on peut déduire ou confirmer depuis CET échange
+- N'invente rien, omets les champs incertains
+- Pour score_engagement: 0-100 (80+ = prêt à s'inscrire)
+- Pour tags_ia: JSON array stringifié ex: "[\"parent\", \"urgent\"]"
+- Retourne UNIQUEMENT le JSON brut, sans balises markdown
 
-Champs possibles :
-- prenom (string)
-- nom (string)
-- age (string, ex: "14" ou "Parent enfant 12 ans")
-- profil_type (string: "Parent" | "Enfant" | "Etudiant" | "Pro" | "Entrepreneur")
-- centre_interet (string)
-- niveau_actuel (string: "Débutant" | "Quelques bases" | "Intermédiaire" | "Avancé")
-- disponibilite (string)
-- objectif (string)
-- budget_mentionne (string)
-- objections (string)
-- programme_recommande (string: "ClassTech" | "Ecole229" | "KMC" | "Incubateur" | "FabLab")
-- statut_lead (string: "Nouveau" | "Qualifie" | "Proposition faite" | "Interesse" | "Inscription" | "Froid")
-- score_lead (integer entre 1 et 10)
-- notes (string, observations libres)
-
-Retourne UNIQUEMENT le JSON, sans texte autour.
+Champs disponibles à extraire :
+ prenom, nom, age, telephone, email, ville,
+ persona, persona_nom, profil_type, secteur_activite, statut_professionnel,
+ niveau_revenu, taille_entreprise,
+ ambition, frustration_principale, aspiration,
+ interet_principal, centres_interet, objectif,
+ niveau_actuel ("Débutant"|"Quelques bases"|"Intermédiaire"|"Avancé"),
+ disponibilite, equipement,
+ budget_mentionne, budget_fourchette,
+ programme_recommande ("ClassTech"|"Ecole229"|"KMC"|"Incubateur"|"FabLab"),
+ programme_interesse, paiement_prefere, roi_attendu,
+ objections, objection_principale, niveau_confiance,
+ statut_conversation ("Nouveau"|"Qualifie"|"Proposition faite"|"Interesse"|"Inscription"|"Froid"),
+ etape_parcours, evenement_cible,
+ score_engagement (0-100), tendance_engagement,
+ niveau_urgence ("Faible"|"Moyen"|"Élevé"),
+ niveau_motivation ("Faible"|"Moyen"|"Élevé"),
+ tags_ia, sentiment_global ("positif"|"neutre"|"négatif"),
+ derniere_analyse_ia, notes_auto
 `
 
   try {
@@ -448,6 +516,7 @@ Retourne UNIQUEMENT le JSON, sans texte autour.
     const extracted = JSON.parse(jsonText)
     return extracted
   } catch {
+    // En cas d'échec du parsing, retourner un objet vide (pas de mise à jour)
     return {}
   }
 }
