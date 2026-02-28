@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createHmac } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/server'
 import { triggerAIResponse } from '@/lib/ai/rag-pipeline'
@@ -140,11 +141,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
     }
 
-    // Message texte → pipeline IA (async, on répond 200 immédiatement)
+    // Message texte → pipeline IA avec waitUntil (Vercel reste actif)
     if (isTextMessage && body && conversationStatus === 'ai_active') {
-        // Fire-and-forget pour répondre rapidement au webhook
-        triggerAIResponse({ from, text: body, conversationId }).catch((err) =>
-            console.error('[Webhook] Erreur pipeline IA:', err)
+        waitUntil(
+            triggerAIResponse({ from, text: body, conversationId }).catch((err) =>
+                console.error('[Webhook] Erreur pipeline IA:', err)
+            )
         )
         return NextResponse.json({ ok: true })
     }
