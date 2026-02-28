@@ -91,11 +91,11 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
 
     // ─── [6] APPEL LLM ──────────────────────────────────────────────
     let aiResponse = ''
-    let modelUsed = 'gemini-2.0-flash'
+    let modelUsed = 'gemini-2.5-flash'
 
     try {
         const chatModel = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-2.5-flash',
             systemInstruction: fullSystemPrompt,
         })
         const chat = chatModel.startChat({ history: historyFormatted })
