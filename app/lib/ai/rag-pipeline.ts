@@ -36,17 +36,12 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     const queryEmbedding = await getEmbedding(text)
 
     // ─── [2] RECHERCHE VECTORIELLE (table: documents) ────────────────
-    const similarityThreshold = 0.75
+    const similarityThreshold = 0.60
     const { data: chunks } = await supabase.rpc('match_documents', {
         query_embedding: queryEmbedding,
         match_threshold: similarityThreshold,
         match_count: 5,
     })
-
-    if (!chunks || chunks.length === 0) {
-        await handleNoContextEscalation(from, conversationId, supabase)
-        return
-    }
 
     // ─── [3] HISTORIQUE DE CONVERSATION ─────────────────────────────
     const { data: history } = await supabase
@@ -160,20 +155,30 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     })
 }
 
-// ─── Escalade quand aucun contexte RAG trouvé ────────────────────
+// ─── Escalade quand l'IA ne sait pas répondre ────────────────────
 async function handleNoContextEscalation(
     from: string,
     conversationId: string,
     supabase: ReturnType<typeof createAdminClient>
 ) {
-    await sendWhatsAppMessage(from,
-        `Je n'ai pas l'information pour ça en ce moment. Je transmets votre demande ` +
+    const escalationMessage = `Je n'ai pas l'information pour ça en ce moment. Je transmets votre demande ` +
         `à l'équipe BloLab qui vous répondra très bientôt.`
-    )
+
+    await sendWhatsAppMessage(from, escalationMessage)
+
     await supabase
         .from('conversations')
         .update({ status: 'escalated' })
         .eq('id', conversationId)
+
+    await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        contact_chat_id: from,
+        direction: 'outbound',
+        message_type: 'text',
+        body: escalationMessage,
+        is_ai_response: true,
+    })
 }
 
 // ─── Fallback OpenAI si Gemini échoue ───────────────────────────
