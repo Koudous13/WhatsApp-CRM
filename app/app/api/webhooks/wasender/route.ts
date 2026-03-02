@@ -18,6 +18,14 @@ export async function POST(req: NextRequest) {
     // ─── Validation HMAC ──────────────────────────────────────────
     const rawBody = await req.text()
 
+    // 🔥 DEBUG EXTRÊME : On enregistre TOUT ce qui touche l'URL du webhook
+    const supabaseDebug = createAdminClient()
+    await supabaseDebug.from('ai_logs').insert({
+        contact_chat_id: 'DEBUG_WEBHOOK',
+        user_message: rawBody.substring(0, 5000),
+        system_prompt: `Headers: ${JSON.stringify(Object.fromEntries(req.headers))}`,
+    })
+
     // WaSenderAPI envoie X-Webhook-Signature (pas x-wasender-signature)
     const signature = req.headers.get('x-webhook-signature')
         ?? req.headers.get('x-wasender-signature')
