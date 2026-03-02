@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Autoriser les events de test ou WaSenderAPI upsert (désactivation temporaire du HMAC strict)
-    if (payload?.event !== 'webhook.test' && payload?.event !== 'messages.upsert' && payload?.event !== 'messages.update') {
+    if (payload?.event !== 'webhook.test' && payload?.event !== 'messages.upsert' && payload?.event !== 'messages.update' && payload?.event !== 'messages.received') {
         console.warn('[Webhook] Event inattendu', payload?.event)
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -59,24 +59,33 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
     }
 
-    if (event !== 'messages.upsert') {
+    if (event !== 'messages.upsert' && event !== 'messages.received') {
         return NextResponse.json({ ok: true }) // Ignorer les autres events
     }
 
     // ─── Extraction du message ────────────────────────────────────
-    const message = data?.messages?.[0]
-    if (!message || message.key?.fromMe) {
+    // WaSenderAPI peut envoyer `messages` comme un tableau (upsert) ou un objet (received)
+    let msgObj = Array.isArray(data?.messages) ? data?.messages[0] : data?.messages
+    if (!msgObj) {
+        return NextResponse.json({ ok: true })
+    }
+
+    const isFromMe = msgObj?.key?.fromMe ?? msgObj?.fromMe ?? false
+    if (isFromMe) {
         return NextResponse.json({ ok: true }) // Ignorer nos propres messages
     }
 
-    const from: string = message.key?.remoteJid?.replace('@s.whatsapp.net', '') ?? ''
-    const messageId: string = message.key?.id ?? ''
-    const messageType: string = message.message ? Object.keys(message.message)[0] : 'unknown'
-    const body: string = message.message?.conversation
-        ?? message.message?.extendedTextMessage?.text
+    const rawRemoteJid = msgObj?.key?.remoteJid ?? msgObj?.remoteJid ?? msgObj?.key?.senderPn ?? ''
+    const from: string = rawRemoteJid.replace('@s.whatsapp.net', '').replace('@lid', '')
+
+    const messageId: string = msgObj?.key?.id ?? msgObj?.id ?? ''
+    const messageType: string = msgObj?.messageType ?? (msgObj?.message ? Object.keys(msgObj.message)[0] : 'unknown')
+    const body: string = msgObj?.message?.conversation
+        ?? msgObj?.messageBody
+        ?? msgObj?.message?.extendedTextMessage?.text
         ?? ''
 
-    if (!from) return NextResponse.json({ ok: true })
+    if (!from || !body) return NextResponse.json({ ok: true })
 
     const supabase = createAdminClient()
 
