@@ -72,7 +72,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true }) // Ignorer nos propres messages
     }
 
-    const rawRemoteJid = msgObj?.key?.remoteJid ?? msgObj?.remoteJid ?? msgObj?.key?.senderPn ?? ''
+    // Pour récupérer le numéro de téléphone, privilégier senderPn ou tout ce qui a `@s.whatsapp.net` (WaSenderAPI peut envoyer un @lid)
+    const senderPn = msgObj?.key?.senderPn ?? msgObj?.senderPn
+    const remoteJid = msgObj?.key?.remoteJid ?? msgObj?.remoteJid
+
+    let rawRemoteJid = ''
+    if (senderPn && senderPn.includes('@s.whatsapp.net')) rawRemoteJid = senderPn
+    else if (remoteJid && remoteJid.includes('@s.whatsapp.net')) rawRemoteJid = remoteJid
+    else rawRemoteJid = senderPn || remoteJid || ''
+
     const from: string = rawRemoteJid.replace('@s.whatsapp.net', '').replace('@lid', '')
 
     const messageId: string = msgObj?.key?.id ?? msgObj?.id ?? ''
@@ -121,7 +129,7 @@ export async function POST(req: NextRequest) {
         message_type: messageType === 'conversation' || messageType === 'extendedTextMessage' ? 'text' : messageType as any,
         body: body || null,
         delivery_status: 'delivered',
-        timestamp: new Date(message.messageTimestamp * 1000).toISOString(),
+        timestamp: new Date((msgObj?.messageTimestamp || Date.now() / 1000) * 1000).toISOString(),
     })
 
     // ─── Dispatch selon le type de message ───────────────────────
