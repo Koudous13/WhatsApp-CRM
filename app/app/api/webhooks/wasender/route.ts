@@ -38,11 +38,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Bad Request' }, { status: 400 })
     }
 
-    // Autoriser les events de test ou WaSenderAPI upsert (désactivation temporaire du HMAC strict)
-    if (payload?.event !== 'webhook.test' && payload?.event !== 'messages.upsert' && payload?.event !== 'messages.update' && payload?.event !== 'messages.received') {
-        console.warn('[Webhook] Event inattendu', payload?.event)
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // AUCUNE VERIFICATION STRICTE D'EVENT ICI POUR DEBUG
+    // (L'ancien bloc validEvents a été retiré temporairement)
 
     // Event de test → répondre OK immédiatement
     if (payload?.event === 'webhook.test') {
