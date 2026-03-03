@@ -217,7 +217,8 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
 
             if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
                 callCount++;
-                for (const toolCall of responseMessage.tool_calls) {
+                for (const toolCallRaw of responseMessage.tool_calls) {
+                    const toolCall: any = toolCallRaw;
                     const functionName = toolCall.function.name;
                     const functionArgs = JSON.parse(toolCall.function.arguments);
                     traceOutilsInfos += ` [TOOL: ${functionName}] `;
