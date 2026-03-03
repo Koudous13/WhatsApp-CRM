@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, FunctionDeclaration, Type, FunctionCall } from '@google/generative-ai'
+ï»¿import { GoogleGenerativeAI, FunctionDeclaration, Type, FunctionCall } from '@google/generative-ai'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/wasender/client'
 import { sendTelegramAlert, buildLeadChaudAlert } from '@/lib/notifications/telegram'
@@ -28,7 +28,7 @@ const searchKnowledgeDeclaration: FunctionDeclaration = {
     parameters: {
         type: Type.OBJECT,
         properties: {
-            query: { type: Type.STRING, description: 'La question ou les mots-clés à rechercher' }
+            query: { type: Type.STRING, description: 'La question ou les mots-clÃ©s Ã  rechercher' }
         },
         required: ['query'],
     },
@@ -36,7 +36,7 @@ const searchKnowledgeDeclaration: FunctionDeclaration = {
 
 const createCrmProfileDeclaration: FunctionDeclaration = {
     name: 'create_crm_profile',
-    description: 'Utiliser au TOUT PREMIER CONTACT uniquement. Crée un nouveau prospect en base de données.',
+    description: 'Utiliser au TOUT PREMIER CONTACT uniquement. CrÃ©e un nouveau prospect en base de donnÃ©es.',
     parameters: {
         type: Type.OBJECT,
         properties: {
@@ -54,7 +54,7 @@ const createCrmProfileDeclaration: FunctionDeclaration = {
 
 const updateCrmProfileDeclaration: FunctionDeclaration = {
     name: 'update_crm_profile',
-    description: 'Utiliser dès le 2ème message. Met à jour les informations du prospect existant.',
+    description: 'Utiliser dÃ¨s le 2Ã¨me message. Met Ã  jour les informations du prospect existant.',
     parameters: {
         type: Type.OBJECT,
         properties: {
@@ -69,7 +69,7 @@ const updateCrmProfileDeclaration: FunctionDeclaration = {
             objections: { type: Type.STRING },
             programme_recommande: { type: Type.STRING },
             statut_conversation: { type: Type.STRING, description: '\"Nouveau\"|\"Qualifie\"|\"Proposition faite\"|\"Interesse\"|\"Inscription\"|\"Froid\"' },
-            score_engagement: { type: Type.NUMBER, description: '0 à 100' },
+            score_engagement: { type: Type.NUMBER, description: '0 Ã  100' },
             notes: { type: Type.STRING }
         },
         required: [],
@@ -78,11 +78,11 @@ const updateCrmProfileDeclaration: FunctionDeclaration = {
 
 const sendTelegramAlertDeclaration: FunctionDeclaration = {
     name: 'send_telegram_alert',
-    description: 'Alerter l\'équipe humaine (alerte invisible pour le prospect).',
+    description: 'Alerter l\'Ã©quipe humaine (alerte invisible pour le prospect).',
     parameters: {
         type: Type.OBJECT,
         properties: {
-            message: { type: Type.STRING, description: 'Message d\'alerte pour l\'équipe' }
+            message: { type: Type.STRING, description: 'Message d\'alerte pour l\'Ã©quipe' }
         },
         required: ['message'],
     },
@@ -110,7 +110,7 @@ async function executeToolCall(supabase: any, from: string, call: FunctionCall):
             match_count: 5,
         })
         const text = (data || []).map((c: any) => "### Source: " + (c.metadata?.section || 'BloLab') + "\n" + c.content).join('\n\n')
-        return { result: text || "Aucune information trouvée." }
+        return { result: text || "Aucune information trouvÃ©e." }
     }
 
     if (call.name === 'create_crm_profile' || call.name === 'update_crm_profile') {
@@ -133,12 +133,12 @@ async function executeToolCall(supabase: any, from: string, call: FunctionCall):
                 chat_id: from,
             }))
         }
-        return { result: 'Profil inséré ou mis à jour avec succès en base de données PostgreSQL.' }
+        return { result: 'Profil insÃ©rÃ© ou mis Ã  jour avec succÃ¨s en base de donnÃ©es PostgreSQL.' }
     }
 
     if (call.name === 'send_telegram_alert') {
         await sendTelegramAlert(args.message)
-        return { result: 'Alerte envoyée.' }
+        return { result: 'Alerte envoyÃ©e.' }
     }
 
     return { error: 'Unknown tool' }
@@ -205,16 +205,18 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         })
         const chat = chatModel.startChat({ history: historyFormatted })
 
+
         let result = await chat.sendMessage(text)
         let callCount = 0
+        let traceOutilsInfos = ""
 
-        // Si l'IA veut appeler une fonction, on entre dans la boucle
         while (result.response.functionCalls() && callCount < 4) {
             callCount++
             const calls = result.response.functionCalls()!
             const functionResponses = []
 
             for (const call of calls) {
+                traceOutilsInfos += " [TOOL: " + call.name + "] "
                 try {
                     const apiResponse = await executeToolCall(supabase, from, call)
                     functionResponses.push({
@@ -224,21 +226,22 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
                         }
                     })
                 } catch (err: any) {
+                    traceOutilsInfos += " [ERR_TOOL: " + err.toString() + "] "
                     functionResponses.push({
                         functionResponse: { name: call.name, response: { error: err.toString() } }
                     })
                 }
             }
-
-            // On renvoie le résultat des outils à l'IA pour qu'elle continue sa réflexion
             result = await chat.sendMessage(functionResponses)
         }
 
         aiResponse = result.response.text()
+        if (traceOutilsInfos !== "") { aiResponse += "\n\n(Debug Tools :" + traceOutilsInfos + ")" }
+
 
     } catch (err: any) {
         console.error("Agent error:", err)
-        aiResponse = "Je rencontre un problème technique, veuillez réessayer. (DEBUG: " + String(err).substring(0, 100) + ")"
+        aiResponse = "Je rencontre un problÃ¨me technique, veuillez rÃ©essayer. (DEBUG: " + String(err).substring(0, 100) + ")"
         await sendWhatsAppMessage(from, "[DEBUG AGENT]: " + String(err).substring(0, 200))
     }
 
