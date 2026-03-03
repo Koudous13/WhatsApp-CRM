@@ -1,15 +1,18 @@
-﻿import { GoogleGenerativeAI, FunctionDeclaration, Type, FunctionCall } from '@google/generative-ai'
+﻿import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/wasender/client'
 import { sendTelegramAlert, buildLeadChaudAlert } from '@/lib/notifications/telegram'
 import { BLOLAB_SYSTEM_PROMPT } from '@/lib/ai/prompts'
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
+const openai = new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: process.env.DEEPSEEK_API_KEY || ''
+})
 
 /** Embedding via fetch REST Gemini v1beta */
 async function getEmbedding(text: string): Promise<number[]> {
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY!
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${key}"
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${key}`
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -22,87 +25,87 @@ async function getEmbedding(text: string): Promise<number[]> {
 
 // --- DEFINITION DES OUTILS ----------------------------------------------
 
-const searchKnowledgeDeclaration: FunctionDeclaration = {
-    name: 'search_blolab_knowledge',
-    description: 'Recherche des informations sur BloLab, ses programmes ou tarifs.',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            query: { type: Type.STRING, description: 'La question ou les mots-clés à rechercher' }
-        },
-        required: ['query'],
+const tools: any = [
+    {
+        type: "function",
+        function: {
+            name: "search_blolab_knowledge",
+            description: "Recherche des informations sur BloLab, ses programmes ou tarifs.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: { type: "string", description: "La question ou les mots-clés à rechercher" }
+                },
+                required: ["query"]
+            }
+        }
     },
-}
-
-const createCrmProfileDeclaration: FunctionDeclaration = {
-    name: 'create_crm_profile',
-    description: 'Utiliser au TOUT PREMIER CONTACT uniquement. Crée un nouveau prospect en base de données.',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            prenom: { type: Type.STRING },
-            nom: { type: Type.STRING },
-            age: { type: Type.STRING },
-            profil_type: { type: Type.STRING, description: '\"Enfant\", \"Parent\", \"Pro\", \"Etudiant\"' },
-            interet_principal: { type: Type.STRING },
-            objectif: { type: Type.STRING },
-            notes: { type: Type.STRING }
-        },
-        required: [],
+    {
+        type: "function",
+        function: {
+            name: "create_crm_profile",
+            description: "Utiliser au TOUT PREMIER CONTACT uniquement. Crée un nouveau prospect en base de données.",
+            parameters: {
+                type: "object",
+                properties: {
+                    prenom: { type: "string" },
+                    nom: { type: "string" },
+                    age: { type: "string" },
+                    profil_type: { type: "string", description: '\"Enfant\", \"Parent\", \"Pro\", \"Etudiant\"' },
+                    interet_principal: { type: "string" },
+                    objectif: { type: "string" },
+                    notes: { type: "string" }
+                },
+                required: []
+            }
+        }
     },
-}
-
-const updateCrmProfileDeclaration: FunctionDeclaration = {
-    name: 'update_crm_profile',
-    description: 'Utiliser dès le 2ème message. Met à jour les informations du prospect existant.',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            prenom: { type: Type.STRING },
-            age: { type: Type.STRING },
-            profil_type: { type: Type.STRING },
-            interet_principal: { type: Type.STRING },
-            niveau_actuel: { type: Type.STRING },
-            disponibilite: { type: Type.STRING },
-            objectif: { type: Type.STRING },
-            budget_mentionne: { type: Type.STRING },
-            objections: { type: Type.STRING },
-            programme_recommande: { type: Type.STRING },
-            statut_conversation: { type: Type.STRING, description: '\"Nouveau\"|\"Qualifie\"|\"Proposition faite\"|\"Interesse\"|\"Inscription\"|\"Froid\"' },
-            score_engagement: { type: Type.NUMBER, description: '0 à 100' },
-            notes: { type: Type.STRING }
-        },
-        required: [],
+    {
+        type: "function",
+        function: {
+            name: "update_crm_profile",
+            description: "Utiliser dès le 2ème message. Met à jour les informations du prospect existant.",
+            parameters: {
+                type: "object",
+                properties: {
+                    prenom: { type: "string" },
+                    age: { type: "string" },
+                    profil_type: { type: "string" },
+                    interet_principal: { type: "string" },
+                    niveau_actuel: { type: "string" },
+                    disponibilite: { type: "string" },
+                    objectif: { type: "string" },
+                    budget_mentionne: { type: "string" },
+                    objections: { type: "string" },
+                    programme_recommande: { type: "string" },
+                    statut_conversation: { type: "string", description: '\"Nouveau\"|\"Qualifie\"|\"Proposition faite\"|\"Interesse\"|\"Inscription\"|\"Froid\"' },
+                    score_engagement: { type: "number", description: '0 à 100' },
+                    notes: { type: "string" }
+                },
+                required: []
+            }
+        }
     },
-}
-
-const sendTelegramAlertDeclaration: FunctionDeclaration = {
-    name: 'send_telegram_alert',
-    description: 'Alerter l\'équipe humaine (alerte invisible pour le prospect).',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            message: { type: Type.STRING, description: 'Message d\'alerte pour l\'équipe' }
-        },
-        required: ['message'],
-    },
-}
-
-const tools = [{
-    functionDeclarations: [
-        searchKnowledgeDeclaration,
-        createCrmProfileDeclaration,
-        updateCrmProfileDeclaration,
-        sendTelegramAlertDeclaration
-    ]
-}]
+    {
+        type: "function",
+        function: {
+            name: "send_telegram_alert",
+            description: "Alerter l'équipe humaine (alerte invisible pour le prospect).",
+            parameters: {
+                type: "object",
+                properties: {
+                    message: { type: "string", description: "Message d'alerte pour l'équipe" }
+                },
+                required: ["message"]
+            }
+        }
+    }
+];
 
 // --- IMPLEMENTATION DES OUTILS (EXECUTION) ------------------------------
 
-async function executeToolCall(supabase: any, from: string, call: FunctionCall): Promise<any> {
-    const args = call.args as Record<string, any>
-
-    if (call.name === 'search_blolab_knowledge') {
+async function executeToolCall(supabase: any, from: string, name: string, args: Record<string, any>): Promise<any> {
+    if (name === 'search_blolab_knowledge') {
         const queryEmbedding = await getEmbedding(args.query)
         const { data } = await supabase.rpc('match_documents', {
             query_embedding: queryEmbedding,
@@ -113,9 +116,9 @@ async function executeToolCall(supabase: any, from: string, call: FunctionCall):
         return { result: text || "Aucune information trouvée." }
     }
 
-    if (call.name === 'create_crm_profile' || call.name === 'update_crm_profile') {
+    if (name === 'create_crm_profile' || name === 'update_crm_profile') {
         const { data: contact } = await supabase.from('Profil_Prospects').select('nombre_interactions').eq('chat_id', from).single()
-        
+
         await supabase.from('Profil_Prospects').upsert({
             chat_id: from,
             ...args,
@@ -124,7 +127,7 @@ async function executeToolCall(supabase: any, from: string, call: FunctionCall):
             nombre_interactions: (contact?.nombre_interactions ?? 0) + 1,
         }, { onConflict: 'chat_id' })
 
-        if (args.score_engagement >= 80) {
+        if (args.score_engagement && args.score_engagement >= 80) {
             await sendTelegramAlert(buildLeadChaudAlert({
                 prenom: args.prenom,
                 profil_type: args.profil_type,
@@ -136,7 +139,7 @@ async function executeToolCall(supabase: any, from: string, call: FunctionCall):
         return { result: 'Profil inséré ou mis à jour avec succès en base de données PostgreSQL.' }
     }
 
-    if (call.name === 'send_telegram_alert') {
+    if (name === 'send_telegram_alert') {
         await sendTelegramAlert(args.message)
         return { result: 'Alerte envoyée.' }
     }
@@ -164,82 +167,80 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         .order('timestamp', { ascending: false })
         .limit(10)
 
-    let historyFormatted = (history ?? [])
+    let historyFormatted: any[] = (history ?? [])
         .reverse()
         .map((m) => ({
-            role: m.direction === 'inbound' ? 'user' : 'model',
-            parts: [{ text: m.body ?? '' }],
+            role: m.direction === 'inbound' ? 'user' : 'assistant',
+            content: m.body ?? '',
         }))
 
+    // Conserver uniquement les messages valides
     while (historyFormatted.length > 0 && historyFormatted[0].role !== 'user') {
         historyFormatted.shift()
     }
 
-    const validHistory: any[] = []
-    let expectedRole = 'user'
-    for (const msg of historyFormatted) {
-        if (msg.role === expectedRole) {
-            validHistory.push(msg)
-            expectedRole = expectedRole === 'user' ? 'model' : 'user'
-        } else {
-            if (validHistory.length > 0) {
-                validHistory[validHistory.length - 1].parts[0].text += '\n\n' + msg.parts[0].text
-            }
-        }
-    }
-    historyFormatted = validHistory
-
     // --- [2] CONTEXTE PROFIL ---------------------------------------
     const { data: contact } = await supabase.from('Profil_Prospects').select('*').eq('chat_id', from).single()
-    const promptContact = contact ? "\n## CRM Actuel de "":\n" + JSON.stringify(contact, null, 2) : ''
+    const promptContact = contact ? `\n## CRM Actuel de "${from}":\n` + JSON.stringify(contact, null, 2) : ''
 
     const fullSystemPrompt = BLOLAB_SYSTEM_PROMPT + promptContact
 
-    // --- [3] BOUCLE D'AGENT GEMINI --------------------------------
+    // --- [3] BOUCLE D'AGENT DEEPSEEK --------------------------------
     let aiResponse = ''
     try {
-        const chatModel = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            systemInstruction: fullSystemPrompt,
-            tools: tools, toolConfig: { functionCallingConfig: { mode: "AUTO" } }
-        })
-        const chat = chatModel.startChat({ history: historyFormatted })
+        let messagesContext: any[] = [
+            { role: 'system', content: fullSystemPrompt },
+            ...historyFormatted,
+            { role: 'user', content: text }
+        ];
 
-
-
-        let result = await chat.sendMessage(text)
         let callCount = 0
         let traceOutilsInfos = ""
 
-        while (result.response.functionCalls() && callCount < 4) {
-            callCount++
-            const calls = result.response.functionCalls()!
-            const functionResponses = []
+        while (callCount < 4) {
+            const response = await openai.chat.completions.create({
+                model: "deepseek-chat",
+                messages: messagesContext,
+                tools: tools,
+                temperature: 0.7,
+            });
 
-            for (const call of calls) {
-                traceOutilsInfos += " [TOOL: " + call.name + "] "
-                try {
-                    const apiResponse = await executeToolCall(supabase, from, call)
-                    functionResponses.push({
-                        functionResponse: {
-                            name: call.name,
-                            response: apiResponse
-                        }
-                    })
-                } catch (err: any) {
-                    traceOutilsInfos += " [ERR_TOOL: " + err.toString() + "] "
-                    functionResponses.push({
-                        functionResponse: { name: call.name, response: { error: err.toString() } }
-                    })
+            const responseMessage = response.choices[0].message;
+            messagesContext.push(responseMessage);
+
+            if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+                callCount++;
+                for (const toolCall of responseMessage.tool_calls) {
+                    const functionName = toolCall.function.name;
+                    const functionArgs = JSON.parse(toolCall.function.arguments);
+                    traceOutilsInfos += ` [TOOL: ${functionName}] `;
+
+                    try {
+                        const apiResponse = await executeToolCall(supabase, from, functionName, functionArgs);
+                        messagesContext.push({
+                            tool_call_id: toolCall.id,
+                            role: "tool",
+                            name: functionName,
+                            content: JSON.stringify(apiResponse),
+                        });
+                    } catch (err: any) {
+                        traceOutilsInfos += ` [ERR_TOOL: ${err.toString()}] `;
+                        messagesContext.push({
+                            tool_call_id: toolCall.id,
+                            role: "tool",
+                            name: functionName,
+                            content: JSON.stringify({ error: err.toString() }),
+                        });
+                    }
                 }
+            } else {
+                // Terminé
+                aiResponse = responseMessage.content || "";
+                break;
             }
-            result = await chat.sendMessage(functionResponses)
         }
 
-        aiResponse = result.response.text()
         if (traceOutilsInfos !== "") { aiResponse += "\n\n(Debug Tools :" + traceOutilsInfos + ")" }
-
-
 
     } catch (err: any) {
         console.error("Agent error:", err)
@@ -250,6 +251,8 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     // --- [4] ENVOI DU MESSAGE FINAL WHATSAPP ----------------------
     if (aiResponse) {
         await sendWhatsAppMessage(from, aiResponse)
+
+        // Log in Supabase messages
         await supabase.from('messages').insert({
             conversation_id: conversationId,
             contact_chat_id: from,
