@@ -1,28 +1,151 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, FunctionDeclaration, Type, FunctionCall } from '@google/generative-ai'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/wasender/client'
-import { extractLeadProfile } from '@/lib/ai/lead-profiler'
 import { sendTelegramAlert, buildLeadChaudAlert } from '@/lib/notifications/telegram'
 import { BLOLAB_SYSTEM_PROMPT } from '@/lib/ai/prompts'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
 
-/** Embedding via fetch REST Gemini v1beta — évite le bug SDK qui force v1beta pour embedContent */
+/** Embedding via fetch REST Gemini v1beta */
 async function getEmbedding(text: string): Promise<number[]> {
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY!
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${key}`
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${key}"
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: { parts: [{ text }] } }),
     })
     const json = await res.json() as any
-    if (!res.ok) throw new Error(`Gemini embedding error: ${JSON.stringify(json)}`)
+    if (!res.ok) throw new Error("Gemini embedding error: " + JSON.stringify(json))
     return json.embedding.values
 }
 
+// --- DEFINITION DES OUTILS ----------------------------------------------
+
+const searchKnowledgeDeclaration: FunctionDeclaration = {
+    name: 'search_blolab_knowledge',
+    description: 'Recherche des informations sur BloLab, ses programmes ou tarifs.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            query: { type: Type.STRING, description: 'La question ou les mots-cl�s � rechercher' }
+        },
+        required: ['query'],
+    },
+}
+
+const createCrmProfileDeclaration: FunctionDeclaration = {
+    name: 'create_crm_profile',
+    description: 'Utiliser au TOUT PREMIER CONTACT uniquement. Cr�e un nouveau prospect en base de donn�es.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            prenom: { type: Type.STRING },
+            nom: { type: Type.STRING },
+            age: { type: Type.STRING },
+            profil_type: { type: Type.STRING, description: '\"Enfant\", \"Parent\", \"Pro\", \"Etudiant\"' },
+            interet_principal: { type: Type.STRING },
+            objectif: { type: Type.STRING },
+            notes: { type: Type.STRING }
+        },
+        required: [],
+    },
+}
+
+const updateCrmProfileDeclaration: FunctionDeclaration = {
+    name: 'update_crm_profile',
+    description: 'Utiliser d�s le 2�me message. Met � jour les informations du prospect existant.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            prenom: { type: Type.STRING },
+            age: { type: Type.STRING },
+            profil_type: { type: Type.STRING },
+            interet_principal: { type: Type.STRING },
+            niveau_actuel: { type: Type.STRING },
+            disponibilite: { type: Type.STRING },
+            objectif: { type: Type.STRING },
+            budget_mentionne: { type: Type.STRING },
+            objections: { type: Type.STRING },
+            programme_recommande: { type: Type.STRING },
+            statut_conversation: { type: Type.STRING, description: '\"Nouveau\"|\"Qualifie\"|\"Proposition faite\"|\"Interesse\"|\"Inscription\"|\"Froid\"' },
+            score_engagement: { type: Type.NUMBER, description: '0 � 100' },
+            notes: { type: Type.STRING }
+        },
+        required: [],
+    },
+}
+
+const sendTelegramAlertDeclaration: FunctionDeclaration = {
+    name: 'send_telegram_alert',
+    description: 'Alerter l\'�quipe humaine (alerte invisible pour le prospect).',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            message: { type: Type.STRING, description: 'Message d\'alerte pour l\'�quipe' }
+        },
+        required: ['message'],
+    },
+}
+
+const tools = [{
+    functionDeclarations: [
+        searchKnowledgeDeclaration,
+        createCrmProfileDeclaration,
+        updateCrmProfileDeclaration,
+        sendTelegramAlertDeclaration
+    ]
+}]
+
+// --- IMPLEMENTATION DES OUTILS (EXECUTION) ------------------------------
+
+async function executeToolCall(supabase: any, from: string, call: FunctionCall): Promise<any> {
+    const args = call.args as Record<string, any>
+
+    if (call.name === 'search_blolab_knowledge') {
+        const queryEmbedding = await getEmbedding(args.query)
+        const { data } = await supabase.rpc('match_documents', {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.60,
+            match_count: 5,
+        })
+        const text = (data || []).map((c: any) => "### Source: " + (c.metadata?.section || 'BloLab') + "\n" + c.content).join('\n\n')
+        return { result: text || "Aucune information trouv�e." }
+    }
+
+    if (call.name === 'create_crm_profile' || call.name === 'update_crm_profile') {
+        const { data: contact } = await supabase.from('Profil_Prospects').select('nombre_interactions').eq('chat_id', from).single()
+        
+        await supabase.from('Profil_Prospects').upsert({
+            chat_id: from,
+            ...args,
+            updated_at: new Date().toISOString(),
+            date_derniere_activite: new Date().toISOString(),
+            nombre_interactions: (contact?.nombre_interactions ?? 0) + 1,
+        }, { onConflict: 'chat_id' })
+
+        if (args.score_engagement >= 80) {
+            await sendTelegramAlert(buildLeadChaudAlert({
+                prenom: args.prenom,
+                profil_type: args.profil_type,
+                programme_recommande: args.programme_recommande,
+                score_engagement: args.score_engagement,
+                chat_id: from,
+            }))
+        }
+        return { result: 'Profil ins�r� ou mis � jour avec succ�s en base de donn�es PostgreSQL.' }
+    }
+
+    if (call.name === 'send_telegram_alert') {
+        await sendTelegramAlert(args.message)
+        return { result: 'Alerte envoy�e.' }
+    }
+
+    return { error: 'Unknown tool' }
+}
+
 export interface RAGInput {
-    from: string           // Numéro WhatsApp (= chat_id dans Profil_Prospects)
+    from: string
     text: string
     conversationId: string
 }
@@ -32,26 +155,7 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     const startTime = Date.now()
     const supabase = createAdminClient()
 
-    // ─── [1] EMBEDDING DU MESSAGE ────────────────────────────────────
-    const queryEmbedding = await getEmbedding(text)
-
-    // ─── [2] RECHERCHE VECTORIELLE (table: documents) ────────────────
-    const similarityThreshold = 0.60
-
-    let chunks: any = []
-    try {
-        const { data } = await supabase.rpc('match_documents', {
-            query_embedding: queryEmbedding,
-            match_threshold: similarityThreshold,
-            match_count: 5,
-        })
-        chunks = data
-    } catch (dbErr) {
-        await sendWhatsAppMessage(from, "[DEBUG] Erreur DB Match Documents: " + String(dbErr).substring(0, 200))
-        throw dbErr
-    }
-
-    // ─── [3] HISTORIQUE DE CONVERSATION ─────────────────────────────
+    // --- [1] HISTORIQUE DE CONVERSATION -----------------------------
     const { data: history } = await supabase
         .from('messages')
         .select('direction, body, timestamp')
@@ -67,7 +171,6 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
             parts: [{ text: m.body ?? '' }],
         }))
 
-    // Gemini exige que l'historique commence par "user" et s'alterne strictement
     while (historyFormatted.length > 0 && historyFormatted[0].role !== 'user') {
         historyFormatted.shift()
     }
@@ -79,7 +182,6 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
             validHistory.push(msg)
             expectedRole = expectedRole === 'user' ? 'model' : 'user'
         } else {
-            // Fusionner les messages consécutifs du même rôle
             if (validHistory.length > 0) {
                 validHistory[validHistory.length - 1].parts[0].text += '\n\n' + msg.parts[0].text
             }
@@ -87,164 +189,69 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     }
     historyFormatted = validHistory
 
-    // ─── [4] RÉCUPÉRATION PROFIL PROSPECT ───────────────────────────
-    const { data: contact } = await supabase
-        .from('Profil_Prospects')
-        .select('prenom, profil_type, interet_principal, etape_parcours, score_engagement, programme_recommande, objectif, nombre_interactions')
-        .eq('chat_id', from)
-        .single()
+    // --- [2] CONTEXTE PROFIL ---------------------------------------
+    const { data: contact } = await supabase.from('Profil_Prospects').select('*').eq('chat_id', from).single()
+    const promptContact = contact ? "\n## CRM Actuel de "":\n" + JSON.stringify(contact, null, 2) : ''
 
-    // ─── [5] CONSTRUCTION DU PROMPT ─────────────────────────────────
-    const ragContext = (chunks as any[])
-        .map((c) => `### Source: ${c.metadata?.section ?? 'BloLab'}\n${c.content}`)
-        .join('\n\n')
+    const fullSystemPrompt = BLOLAB_SYSTEM_PROMPT + promptContact
 
-    const contactContext = contact?.prenom
-        ? `\n## Profil du contact\nPrénom: ${contact.prenom}` +
-        (contact.profil_type ? ` | Type: ${contact.profil_type}` : '') +
-        (contact.interet_principal ? ` | Intérêt: ${contact.interet_principal}` : '') +
-        (contact.etape_parcours ? ` | Étape: ${contact.etape_parcours}` : '') +
-        (contact.programme_recommande ? ` | Programme: ${contact.programme_recommande}` : '')
-        : ''
-
-    const fullSystemPrompt =
-        BLOLAB_SYSTEM_PROMPT +
-        contactContext +
-        `\n\n## Informations BloLab pertinentes\n${ragContext}`
-
-    // ─── [6] APPEL LLM ──────────────────────────────────────────────
+    // --- [3] BOUCLE D'AGENT GEMINI --------------------------------
     let aiResponse = ''
-    let modelUsed = 'gemini-2.5-flash'
-
     try {
         const chatModel = genAI.getGenerativeModel({
             model: 'gemini-2.5-flash',
             systemInstruction: fullSystemPrompt,
+            tools: tools
         })
         const chat = chatModel.startChat({ history: historyFormatted })
-        const result = await chat.sendMessage(text)
-        aiResponse = result.response.text()
-    } catch (geminiError) {
-        console.error("Gemini failed, trying OpenAI:", geminiError)
-        try {
-            aiResponse = await fallbackOpenAI(fullSystemPrompt, historyFormatted, text)
-            modelUsed = 'gpt-4o-mini'
-        } catch (openAiError) {
-            console.error("OpenAI Fallback failed:", openAiError)
-            await sendWhatsAppMessage(from, "[DEBUG] Erreur IA Globale:\nGemini: " + String(geminiError).substring(0, 100) + "\nOpenAI: " + String(openAiError).substring(0, 100))
-            throw openAiError
+
+        let result = await chat.sendMessage(text)
+        let callCount = 0
+
+        // Si l'IA veut appeler une fonction, on entre dans la boucle
+        while (result.response.functionCalls() && callCount < 4) {
+            callCount++
+            const calls = result.response.functionCalls()!
+            const functionResponses = []
+
+            for (const call of calls) {
+                try {
+                    const apiResponse = await executeToolCall(supabase, from, call)
+                    functionResponses.push({
+                        functionResponse: {
+                            name: call.name,
+                            response: apiResponse
+                        }
+                    })
+                } catch (err: any) {
+                    functionResponses.push({
+                        functionResponse: { name: call.name, response: { error: err.toString() } }
+                    })
+                }
+            }
+
+            // On renvoie le r�sultat des outils � l'IA pour qu'elle continue sa r�flexion
+            result = await chat.sendMessage(functionResponses)
         }
+
+        aiResponse = result.response.text()
+
+    } catch (err: any) {
+        console.error("Agent error:", err)
+        aiResponse = "Je rencontre un probl�me technique, veuillez r�essayer. (DEBUG: " + String(err).substring(0, 100) + ")"
+        await sendWhatsAppMessage(from, "[DEBUG AGENT]: " + String(err).substring(0, 200))
     }
 
-    // ─── [7] PROFILAGE SILENCIEUX ────────────────────────────────────
-    const profileUpdate = await extractLeadProfile(text, aiResponse, contact)
-    if (Object.keys(profileUpdate).length > 0) {
-        await supabase
-            .from('Profil_Prospects')
-            .upsert({
-                chat_id: from,
-                ...profileUpdate,
-                date_derniere_activite: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                nombre_interactions: (contact?.nombre_interactions ?? 0) + 1,
-            }, { onConflict: 'chat_id' })
+    // --- [4] ENVOI DU MESSAGE FINAL WHATSAPP ----------------------
+    if (aiResponse) {
+        await sendWhatsAppMessage(from, aiResponse)
+        await supabase.from('messages').insert({
+            conversation_id: conversationId,
+            contact_chat_id: from,
+            direction: 'outbound',
+            message_type: 'text',
+            body: aiResponse,
+            is_ai_response: true,
+        })
     }
-
-    // ─── [8] ALERTE TELEGRAM LEAD CHAUD ─────────────────────────────
-    const newScore = profileUpdate.score_engagement
-    if (newScore && newScore >= 80 && (contact?.score_engagement ?? 0) < 80) {
-        await sendTelegramAlert(buildLeadChaudAlert({
-            prenom: profileUpdate.prenom ?? contact?.prenom,
-            profil_type: profileUpdate.profil_type ?? contact?.profil_type,
-            programme_recommande: profileUpdate.programme_recommande ?? contact?.programme_recommande,
-            etape_parcours: profileUpdate.etape_parcours ?? contact?.etape_parcours,
-            score_engagement: newScore,
-            chat_id: from,
-        }))
-    }
-
-    // ─── [9] ENVOI RÉPONSE WHATSAPP ──────────────────────────────────
-    await sendWhatsAppMessage(from, aiResponse)
-
-    // ─── [10] LOG IA ─────────────────────────────────────────────────
-    await supabase.from('messages').insert({
-        conversation_id: conversationId,
-        contact_chat_id: from,
-        direction: 'outbound',
-        message_type: 'text',
-        body: aiResponse,
-        is_ai_response: true,
-    })
-
-    await supabase.from('ai_logs').insert({
-        conversation_id: conversationId,
-        contact_chat_id: from,
-        user_message: text,
-        chunks_retrieved: chunks,
-        similarity_threshold: similarityThreshold,
-        system_prompt: fullSystemPrompt.slice(0, 2000),
-        llm_response: aiResponse,
-        llm_model: modelUsed,
-        processing_time_ms: Date.now() - startTime,
-        was_escalated: false,
-    })
-}
-
-// ─── Escalade quand l'IA ne sait pas répondre ────────────────────
-async function handleNoContextEscalation(
-    from: string,
-    conversationId: string,
-    supabase: ReturnType<typeof createAdminClient>
-) {
-    const escalationMessage = `Je n'ai pas l'information pour ça en ce moment. Je transmets votre demande ` +
-        `à l'équipe BloLab qui vous répondra très bientôt.`
-
-    await sendWhatsAppMessage(from, escalationMessage)
-
-    await supabase
-        .from('conversations')
-        .update({ status: 'escalated' })
-        .eq('id', conversationId)
-
-    await supabase.from('messages').insert({
-        conversation_id: conversationId,
-        contact_chat_id: from,
-        direction: 'outbound',
-        message_type: 'text',
-        body: escalationMessage,
-        is_ai_response: true,
-    })
-}
-
-// ─── Fallback OpenAI si Gemini échoue ───────────────────────────
-async function fallbackOpenAI(
-    systemPrompt: string,
-    history: any[],
-    userMessage: string
-): Promise<string> {
-    const messages = [
-        { role: 'system', content: systemPrompt },
-        ...history.map((h: any) => ({
-            role: h.role === 'model' ? 'assistant' : 'user',
-            content: h.parts[0].text,
-        })),
-        { role: 'user', content: userMessage },
-    ]
-
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ model: 'gpt-4o-mini', messages, max_tokens: 500, temperature: 0.7 }),
-    })
-
-    if (!res.ok) {
-        const errText = await res.text()
-        throw new Error(`OpenAI API status ${res.status}: ${errText}`)
-    }
-
-    const data = await res.json()
-    return data.choices?.[0]?.message?.content ?? "Je rencontre un problème technique, veuillez réessayer."
 }
