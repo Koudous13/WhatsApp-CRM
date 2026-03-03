@@ -50,8 +50,37 @@ export default function InboxPage() {
                 .select(`id, contact_chat_id, status, last_message_preview, last_message_at, unread_count,
           Profil_Prospects(prenom, nom, profil_type, score_engagement, statut_conversation)`)
                 .order('last_message_at', { ascending: false })
-                .limit(50)
-            setConversations((data as any) ?? [])
+            const convs = (data as any) ?? []
+            setConversations(convs)
+
+            // Auto-sélection si l'utilisateur arrive depuis Telegram via ?chat_id=XXX
+            if (typeof window !== 'undefined') {
+                const urlChatId = new URLSearchParams(window.location.search).get('chat_id')
+                if (urlChatId) {
+                    const c = convs.find((x: any) => x.contact_chat_id === urlChatId)
+                    if (c) {
+                        // On doit appeler manuellement setSelected et loadMessages 
+                        // parce que selectConversation n'est pas encore initialisée lexicalement dans React
+                        setSelected(c)
+
+                        // Récupération immédiate des messages
+                        const { data: msgs } = await supabase
+                            .from('messages')
+                            .select('id, body, direction, message_type, is_ai_response, timestamp, delivery_status, transcript')
+                            .eq('conversation_id', c.id)
+                            .order('timestamp', { ascending: true })
+                            .limit(100)
+                        setMessages((msgs as any) ?? [])
+                        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)
+
+                        // Remettre unread_count à 0
+                        await supabase.from('conversations').update({ unread_count: 0 }).eq('id', c.id)
+
+                        // Nettoyer l'URL
+                        window.history.replaceState({}, '', window.location.pathname)
+                    }
+                }
+            }
         }
         load()
 

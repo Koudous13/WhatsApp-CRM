@@ -32,14 +32,17 @@ export function buildLeadChaudAlert(params: {
     score_engagement?: number
     chat_id: string
 }) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://whatsapp-crm-blolabparakou.vercel.app'
+    const inboxUrl = `${appUrl}/inbox?chat_id=${params.chat_id}`
+
     return (
         `🔥 *LEAD CHAUD — BloLab CRM*\n\n` +
         `👤 *Prénom:* ${params.prenom ?? 'Inconnu'}\n` +
         `🏷️ *Profil:* ${params.profil_type ?? '-'}\n` +
         `🎯 *Programme:* ${params.programme_recommande ?? '-'}\n` +
         `📍 *Étape:* ${params.etape_parcours ?? 'Découverte'}\n` +
-        `📊 *Score engagement:* ${params.score_engagement ?? 0}/100\n` +
+        `📊 *Score:* ${params.score_engagement ?? 0}/100\n` +
         `📱 *WhatsApp:* ${params.chat_id}\n\n` +
-        `👉 Contacter rapidement !`
+        `👉 [Ouvrir la conversation Inbox](${inboxUrl})`
     )
 }
