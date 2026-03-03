@@ -60,12 +60,32 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         .order('timestamp', { ascending: false })
         .limit(10)
 
-    const historyFormatted = (history ?? [])
+    let historyFormatted = (history ?? [])
         .reverse()
         .map((m) => ({
             role: m.direction === 'inbound' ? 'user' : 'model',
             parts: [{ text: m.body ?? '' }],
         }))
+
+    // Gemini exige que l'historique commence par "user" et s'alterne strictement
+    while (historyFormatted.length > 0 && historyFormatted[0].role !== 'user') {
+        historyFormatted.shift()
+    }
+
+    const validHistory: any[] = []
+    let expectedRole = 'user'
+    for (const msg of historyFormatted) {
+        if (msg.role === expectedRole) {
+            validHistory.push(msg)
+            expectedRole = expectedRole === 'user' ? 'model' : 'user'
+        } else {
+            // Fusionner les messages consécutifs du même rôle
+            if (validHistory.length > 0) {
+                validHistory[validHistory.length - 1].parts[0].text += '\n\n' + msg.parts[0].text
+            }
+        }
+    }
+    historyFormatted = validHistory
 
     // ─── [4] RÉCUPÉRATION PROFIL PROSPECT ───────────────────────────
     const { data: contact } = await supabase
