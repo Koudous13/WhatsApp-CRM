@@ -160,9 +160,9 @@ export default function InboxPage() {
     }
 
     return (
-        <div className="flex h-screen">
-            {/* ── Panneau conversations ─────────────────────────────── */}
-            <div className="w-80 flex flex-col border-r" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
+        <div className="flex h-screen overflow-hidden">
+            {/* ── Panneau conversations (1ère Colonne) ──────────────── */}
+            <div className="w-80 flex flex-col flex-shrink-0 border-r" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
                 <div className="p-4 border-b" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
                     <h1 className="text-lg font-bold text-white mb-3">Inbox</h1>
                     <input
@@ -225,109 +225,174 @@ export default function InboxPage() {
                 </div>
             </div>
 
-            {/* ── Zone messages ─────────────────────────────────────── */}
+            {/* ── Zone messages (2ème Colonne Centrale) ─────────────── */}
             {selected ? (
-                <div className="flex-1 flex flex-col">
-                    {/* Header contact */}
-                    <div className="px-6 py-4 border-b flex items-center justify-between"
-                        style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600
+                <>
+                    <div className="flex-1 flex flex-col min-w-0 border-r" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
+                        {/* Header contact */}
+                        <div className="px-6 py-4 border-b flex items-center justify-between"
+                            style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600
                 flex items-center justify-center text-sm font-bold text-white">
-                                {getInitials(
-                                    selected.Profil_Prospects?.prenom ?? undefined,
-                                    selected.Profil_Prospects?.nom ?? undefined
+                                    {getInitials(
+                                        selected.Profil_Prospects?.prenom ?? undefined,
+                                        selected.Profil_Prospects?.nom ?? undefined
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-white">
+                                        {selected.Profil_Prospects?.prenom
+                                            ? `${selected.Profil_Prospects.prenom} ${selected.Profil_Prospects.nom ?? ''}`.trim()
+                                            : selected.contact_chat_id}
+                                    </p>
+                                    <p className="text-xs text-slate-400">{selected.contact_chat_id}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-slate-400">Score:</span>
+                                <span className="text-sm font-bold text-emerald-400">
+                                    {selected.Profil_Prospects?.score_engagement ?? 0}/100
+                                </span>
+                                <span className="badge ml-2" style={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
+                                    {selected.status?.replace('_', ' ')}
+                                </span>
+                                {selected.status !== 'ai_active' && (
+                                    <button
+                                        onClick={handoverToAI}
+                                        disabled={handingOver}
+                                        className="ml-4 px-3 py-1 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-full text-xs hover:bg-purple-600/30 transition-colors"
+                                    >
+                                        {handingOver ? '...Activation...' : '🤖 Rendre à l\'IA'}
+                                    </button>
                                 )}
                             </div>
-                            <div>
-                                <p className="font-semibold text-white">
-                                    {selected.Profil_Prospects?.prenom
-                                        ? `${selected.Profil_Prospects.prenom} ${selected.Profil_Prospects.nom ?? ''}`.trim()
-                                        : selected.contact_chat_id}
-                                </p>
-                                <p className="text-xs text-slate-400">{selected.contact_chat_id}</p>
-                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-slate-400">Score:</span>
-                            <span className="text-sm font-bold text-emerald-400">
-                                {selected.Profil_Prospects?.score_engagement ?? 0}/100
-                            </span>
-                            <span className="badge ml-2" style={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
-                                {selected.status?.replace('_', ' ')}
-                            </span>
-                            {selected.status !== 'ai_active' && (
-                                <button
-                                    onClick={handoverToAI}
-                                    disabled={handingOver}
-                                    className="ml-4 px-3 py-1 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-full text-xs hover:bg-purple-600/30 transition-colors"
-                                >
-                                    {handingOver ? '...Activation...' : '🤖 Rendre à l\'IA'}
-                                </button>
-                            )}
-                        </div>
-                    </div>
 
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                        {messages.map(msg => {
-                            const isOut = msg.direction === 'outbound'
-                            return (
-                                <div key={msg.id} className={cn('flex', isOut ? 'justify-end' : 'justify-start')}>
-                                    <div className={cn(
-                                        'max-w-[70%] px-4 py-3 text-sm animate-fadeIn',
-                                        isOut ? 'msg-bubble-out text-blue-100' : 'msg-bubble-in text-slate-200'
-                                    )}>
-                                        {msg.message_type !== 'text' ? (
-                                            <span className="italic text-slate-400">
-                                                [{msg.message_type === 'audio' ? '🎤 Audio' :
-                                                    msg.message_type === 'image' ? '🖼️ Image' :
-                                                        msg.message_type === 'video' ? '🎥 Vidéo' :
-                                                            '📎 Fichier'}] → Pris en charge par un conseiller
-                                            </span>
-                                        ) : (
-                                            <p className="whitespace-pre-wrap">{msg.body}</p>
-                                        )}
-                                        <div className="flex items-center justify-between mt-1.5 gap-2">
-                                            <span className="text-xs text-slate-500">{formatTime(msg.timestamp)}</span>
-                                            {isOut && (
-                                                <span className="text-xs text-slate-500">
-                                                    {msg.is_ai_response ? '🤖' : '👤'}
-                                                    {msg.delivery_status === 'read' ? ' ✓✓' :
-                                                        msg.delivery_status === 'delivered' ? ' ✓' : ''}
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {messages.map(msg => {
+                                const isOut = msg.direction === 'outbound'
+                                return (
+                                    <div key={msg.id} className={cn('flex', isOut ? 'justify-end' : 'justify-start')}>
+                                        <div className={cn(
+                                            'max-w-[70%] px-4 py-3 text-sm animate-fadeIn',
+                                            isOut ? 'msg-bubble-out text-blue-100' : 'msg-bubble-in text-slate-200'
+                                        )}>
+                                            {msg.message_type !== 'text' ? (
+                                                <span className="italic text-slate-400">
+                                                    [{msg.message_type === 'audio' ? '🎤 Audio' :
+                                                        msg.message_type === 'image' ? '🖼️ Image' :
+                                                            msg.message_type === 'video' ? '🎥 Vidéo' :
+                                                                '📎 Fichier'}] → Pris en charge par un conseiller
                                                 </span>
+                                            ) : (
+                                                <p className="whitespace-pre-wrap">{msg.body}</p>
                                             )}
+                                            <div className="flex items-center justify-between mt-1.5 gap-2">
+                                                <span className="text-xs text-slate-500">{formatTime(msg.timestamp)}</span>
+                                                {isOut && (
+                                                    <span className="text-xs text-slate-500">
+                                                        {msg.is_ai_response ? '🤖' : '👤'}
+                                                        {msg.delivery_status === 'read' ? ' ✓✓' :
+                                                            msg.delivery_status === 'delivered' ? ' ✓' : ''}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )
-                        })}
-                        <div ref={messagesEndRef} />
+                                )
+                            })}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Zone de réponse */}
+                        <div className="p-4 border-t" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
+                            <div className="flex gap-3">
+                                <textarea
+                                    value={replyText}
+                                    onChange={e => setReplyText(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
+                                    placeholder="Répondre en tant qu'admin (Entrée pour envoyer)..."
+                                    rows={2}
+                                    className="flex-1 px-4 py-3 rounded-xl text-sm text-white placeholder-slate-500
+                  focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                                    style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
+                                />
+                                <button onClick={sendReply} disabled={sending || !replyText.trim()}
+                                    className="btn-primary px-4 self-end flex items-center gap-2">
+                                    {sending ? '...' : '→ Envoyer'}
+                                </button>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-2">
+                                💡 En répondant manuellement, vous prenez le contrôle de la conversation (l'IA se tait).
+                            </p>
+                        </div>
                     </div>
 
-                    {/* Zone de réponse */}
-                    <div className="p-4 border-t" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
-                        <div className="flex gap-3">
-                            <textarea
-                                value={replyText}
-                                onChange={e => setReplyText(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
-                                placeholder="Répondre en tant qu'admin (Entrée pour envoyer)..."
-                                rows={2}
-                                className="flex-1 px-4 py-3 rounded-xl text-sm text-white placeholder-slate-500
-                  focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-                                style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
-                            />
-                            <button onClick={sendReply} disabled={sending || !replyText.trim()}
-                                className="btn-primary px-4 self-end flex items-center gap-2">
-                                {sending ? '...' : '→ Envoyer'}
-                            </button>
+                    {/* ── Panneau Prospect (3ème Colonne) ──────────────────── */}
+                    <div className="w-80 flex flex-col flex-shrink-0 overflow-y-auto animate-fadeIn" style={{ background: 'rgba(10, 15, 30, 0.4)' }}>
+                        <div className="p-5 border-b" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
+                            <h2 className="font-bold text-white">Profil IA du Prospect</h2>
+                            <p className="text-xs text-slate-400">Données extraites automatiquement</p>
                         </div>
-                        <p className="text-xs text-slate-600 mt-2">
-                            💡 En répondant manuellement, vous prenez le contrôle de la conversation (l'IA se tait).
-                        </p>
+
+                        <div className="p-5 space-y-6">
+                            {/* Score global (Jauge) */}
+                            <div className="text-center p-4 rounded-2xl glass-card relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-1"
+                                    style={{ background: `linear-gradient(90deg, #34d399 ${(selected.Profil_Prospects?.score_engagement ?? 0)}%, transparent 0)` }} />
+                                <div className="relative inline-flex items-center justify-center w-24 h-24 rounded-full mb-3 mt-2"
+                                    style={{ background: `conic-gradient(#34d399 ${(selected.Profil_Prospects?.score_engagement ?? 0)}%, rgba(30,58,95,0.3) 0)` }}>
+                                    <div className="absolute inset-1.5 rounded-full flex flex-col items-center justify-center" style={{ background: '#0a0f1e' }}>
+                                        <span className="text-2xl font-black text-white leading-none">{selected.Profil_Prospects?.score_engagement ?? 0}</span>
+                                        <span className="text-[9px] text-slate-400 mt-1">SCORE</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm font-bold text-emerald-400">
+                                    {(selected.Profil_Prospects?.score_engagement ?? 0) >= 80 ? '🔥 Lead Très Chaud' :
+                                        (selected.Profil_Prospects?.score_engagement ?? 0) >= 50 ? '⭐ Intéressé' : '❄️ Froid'}
+                                </p>
+                            </div>
+
+                            {/* Informations clés */}
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-1">Statut Pipeline</p>
+                                    <span className="inline-block px-2 py-1 text-xs font-semibold rounded-md"
+                                        style={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
+                                        {selected.Profil_Prospects?.statut_conversation ?? 'Nouveau'}
+                                    </span>
+                                </div>
+
+                                <div className="h-px w-full" style={{ background: 'rgba(30, 58, 95, 0.4)' }} />
+
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-1">Nom Complet</p>
+                                    <p className="text-sm text-white font-medium">
+                                        {selected.Profil_Prospects?.prenom ? `${selected.Profil_Prospects.prenom} ${selected.Profil_Prospects.nom ?? ''}`.trim() : 'Non détecté'}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-1">Type de Profil</p>
+                                    <p className="text-sm text-slate-300">{selected.Profil_Prospects?.profil_type ?? 'Non détecté'}</p>
+                                </div>
+
+                                <div className="h-px w-full" style={{ background: 'rgba(30, 58, 95, 0.4)' }} />
+
+                                <div className="bg-blue-500/10 p-3 rounded-xl border border-blue-500/20">
+                                    <p className="text-xs text-blue-300 mb-1">💡 Prochaine Action Conseillée</p>
+                                    <p className="text-xs text-slate-300 leading-relaxed">
+                                        {(selected.Profil_Prospects?.score_engagement ?? 0) >= 80
+                                            ? "Ce prospect est chaud. Proposez-lui un appel ou l'envoi du formulaire d'inscription immédiatement."
+                                            : "Laissez l'IA qualifier ce prospect jusqu'à ce que son score d'engagement atteigne 80."}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </>
             ) : (
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">

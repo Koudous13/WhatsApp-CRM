@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { getInitials, getStatutColor, getScoreColor, truncate } from '@/lib/utils'
+import { getInitials, getStatutColor, getScoreColor, truncate, cn } from '@/lib/utils'
 
 type Prospect = {
     id: number
@@ -74,24 +74,22 @@ export default function ContactsPage() {
                         </div>
                     </div>
 
-                    <div className="flex gap-3 flex-wrap">
-                        <input
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Rechercher un contact..."
-                            className="flex-1 min-w-48 px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
-                        />
-                        <select value={filterProgramme} onChange={e => setFilterProgramme(e.target.value)}
-                            className="px-3 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}>
-                            {PROGRAMMES.map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                        <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)}
-                            className="px-3 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}>
-                            {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex gap-3 flex-wrap items-center">
+                            <input
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Rechercher un contact..."
+                                className="flex-1 min-w-48 px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
+                            />
+                            <div className="flex bg-slate-800/30 rounded-lg p-1 flex-wrap gap-1" style={{ border: '1px solid rgba(30, 58, 95, 0.6)' }}>
+                                <button onClick={() => { setFilterStatut('Tous'); setFilterProgramme('Tous') }} className={cn("px-4 py-1.5 rounded-md text-xs font-semibold transition-all", filterStatut === 'Tous' && filterProgramme === 'Tous' ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-white hover:bg-slate-700/50")}>Tous</button>
+                                <button onClick={() => { setFilterStatut('Qualifie'); setFilterProgramme('Tous') }} className={cn("px-4 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-2", filterStatut === 'Qualifie' ? "bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30" : "text-slate-400 hover:text-white hover:bg-slate-700/50")}>🔥 Hot Leads</button>
+                                <button onClick={() => { setFilterStatut('Tous'); setFilterProgramme('ClassTech') }} className={cn("px-4 py-1.5 rounded-md text-xs font-semibold transition-all", filterProgramme === 'ClassTech' ? "bg-blue-500/20 text-blue-400 shadow-sm border border-blue-500/30" : "text-slate-400 hover:text-white hover:bg-slate-700/50")}>📚 ClassTech</button>
+                                <button onClick={() => { setFilterStatut('Froid'); setFilterProgramme('Tous') }} className={cn("px-4 py-1.5 rounded-md text-xs font-semibold transition-all", filterStatut === 'Froid' ? "bg-slate-800 text-slate-300 shadow-sm border border-slate-600/50" : "text-slate-400 hover:text-white hover:bg-slate-700/50")}>❄️ Froids</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -117,7 +115,7 @@ export default function ContactsPage() {
                                     return (
                                         <tr key={p.id}
                                             onClick={() => setSelected(p)}
-                                            className="border-b cursor-pointer hover:bg-white/3 transition-colors"
+                                            className="border-b cursor-pointer group hover:bg-white/5 transition-colors relative"
                                             style={{ borderColor: 'rgba(30, 58, 95, 0.3)' }}>
                                             <td className="px-6 py-3">
                                                 <div className="flex items-center gap-3">
@@ -142,17 +140,34 @@ export default function ContactsPage() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className={`font-bold ${getScoreColor(p.score_engagement)}`}>
-                                                    {p.score_engagement}/100
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-16 h-2 rounded-full bg-slate-800 overflow-hidden">
+                                                        <div className="h-full rounded-full transition-all"
+                                                            style={{
+                                                                width: `${p.score_engagement}%`,
+                                                                background: p.score_engagement >= 80 ? '#34d399' : p.score_engagement >= 50 ? '#fbbf24' : '#64748b'
+                                                            }} />
+                                                    </div>
+                                                    <span className={`font-bold text-xs ${getScoreColor(p.score_engagement)}`}>
+                                                        {p.score_engagement}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3 text-slate-400">{p.nombre_interactions}</td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 relative">
                                                 {p.niveau_urgence && (
                                                     <span className={`text-xs ${p.niveau_urgence === 'Élevé' ? 'text-red-400' : p.niveau_urgence === 'Moyen' ? 'text-amber-400' : 'text-slate-500'}`}>
                                                         {p.niveau_urgence === 'Élevé' ? '🔴' : p.niveau_urgence === 'Moyen' ? '🟡' : '🟢'} {p.niveau_urgence}
                                                     </span>
                                                 )}
+                                                {/* Hover Action */}
+                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <a href={`/inbox?chat_id=${p.chat_id}`}
+                                                        className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/40 hover:bg-blue-500 hover:text-white flex items-center justify-center transition-all shadow-lg"
+                                                        onClick={(e) => e.stopPropagation()}>
+                                                        💬
+                                                    </a>
+                                                </div>
                                             </td>
                                         </tr>
                                     )

@@ -96,44 +96,55 @@ export default function KnowledgePage() {
                 </button>
             </div>
 
-            {/* ── Formulaire ajout ─────────────────────────────────────────── */}
+            {/* ── Slide-over Ajout ─────────────────────────────────────────── */}
             {showAdd && (
-                <div className="glass-card p-6 space-y-4 animate-fadeIn">
-                    <h2 className="text-lg font-bold text-white">Nouveau document</h2>
-                    <div>
-                        <label className="block text-xs text-slate-400 mb-2">
-                            Section <span className="text-slate-500">(ex: ClassTech, FAQ, Prix...)</span>
-                        </label>
-                        <input value={section} onChange={e => setSection(e.target.value)}
-                            placeholder="BloLab Programmes"
-                            className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs text-slate-400 mb-2">
-                            Contenu * <span className="text-slate-500">({content.length} caractères)</span>
-                        </label>
-                        <textarea value={content} onChange={e => setContent(e.target.value)}
-                            placeholder="Ex: ClassTech est un programme de programmation pour enfants de 7 à 17 ans, au tarif de 90 000 FCFA/an à Cotonou..."
-                            rows={8}
-                            className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-                            style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                            💡 L'embedding vectoriel (3072d) sera généré via Gemini — prend ~15 secondes
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button onClick={addDocument} disabled={saving || !content.trim()}
-                            className="btn-primary flex items-center gap-2">
-                            {saving
-                                ? <><span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full inline-block" /> Génération...</>
-                                : '💾 Sauvegarder'}
-                        </button>
-                        {error && (
-                            <span className="text-red-400 text-sm">{error}</span>
-                        )}
+                <div className="fixed inset-0 z-50 flex justify-end animate-fadeIn">
+                    <div className="absolute inset-0 bg-[#0a0f1e]/80 backdrop-blur-sm transition-opacity" onClick={() => setShowAdd(false)} />
+                    <div className="relative w-full max-w-md h-full bg-[#0f172a] shadow-2xl border-l border-blue-500/20 flex flex-col transform transition-transform duration-300 translate-x-0">
+                        <div className="p-6 border-b border-slate-800/60 flex items-center justify-between bg-slate-900/50">
+                            <div>
+                                <h2 className="text-lg font-bold text-white">Nouveau document</h2>
+                                <p className="text-xs text-slate-400">Enrichissez la base IA</p>
+                            </div>
+                            <button onClick={() => setShowAdd(false)} className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-2">
+                                    Section <span className="text-slate-500">(Optionnelle)</span>
+                                </label>
+                                <input value={section} onChange={e => setSection(e.target.value)}
+                                    placeholder="Ex: FAQ, Programmes, Tarifs"
+                                    className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-slate-900/50 border border-slate-700/50"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex justify-between items-end mb-2">
+                                    <label className="block text-xs font-medium text-slate-400">Contenu *</label>
+                                    <span className="text-[10px] text-slate-500">{content.length} / 5000</span>
+                                </div>
+                                <textarea value={content} onChange={e => setContent(e.target.value)}
+                                    placeholder="Ex: ClassTech coûte 90 000 FCFA..."
+                                    rows={12}
+                                    className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none bg-slate-900/50 border border-slate-700/50"
+                                />
+                                <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 text-xs text-blue-200/80 flex gap-4 mt-6">
+                                    <span className="text-2xl leading-none">🧠</span>
+                                    <p className="leading-relaxed font-medium">Ce texte sera découpé, vectorisé et stocké dans l'espace multidimensionnel pour être exploité par l'Agent Deepseek.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-800/60 bg-slate-900/50">
+                            {error && <div className="mb-4 text-xs font-medium text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-500/20">❌ {error}</div>}
+                            <button onClick={addDocument} disabled={saving || !content.trim()}
+                                className="w-full btn-primary py-3 flex items-center justify-center gap-2 font-bold shadow-lg shadow-blue-500/20 transition-all">
+                                {saving ? <><span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full inline-block" /> Vectorisation en cours...</> : '💾 Ajouter à la base secrète'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -151,31 +162,30 @@ export default function KnowledgePage() {
                     <p className="text-sm mt-1">Ajoutez des informations sur BloLab pour alimenter l'IA</p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                     {docs.map(doc => (
-                        <div key={doc.id} className="glass-card p-4 group hover:border-blue-500/20 transition-all"
+                        <div key={doc.id} className="glass-card p-6 group hover:border-blue-500/30 hover:shadow-lg hover:-translate-y-1 transition-all break-inside-avoid relative"
                             style={{ border: '1px solid rgba(30, 58, 95, 0.4)' }}>
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-2">
+                                    <div className="flex items-center gap-2 mb-3">
                                         {doc.metadata?.section && (
-                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full"
-                                                style={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
+                                            <span className="text-xs font-bold px-3 py-1 rounded-md shadow-sm"
+                                                style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
                                                 {doc.metadata.section}
                                             </span>
                                         )}
-                                        <span className="text-xs text-slate-600">#{doc.id}</span>
-                                        {doc.metadata?.char_count && (
-                                            <span className="text-xs text-slate-600">{doc.metadata.char_count} chars</span>
-                                        )}
+                                        <div className="flex items-center gap-2 px-2 py-1 rounded bg-slate-800/50 border border-slate-700/50">
+                                            <span className="text-[10px] font-mono text-slate-400">#{doc.id}</span>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-slate-300 leading-relaxed">
-                                        {truncate(doc.content, 300)}
+                                    <p className="text-sm text-slate-200 leading-relaxed font-medium">
+                                        {truncate(doc.content, 400)}
                                     </p>
                                 </div>
                                 <button onClick={() => deleteDoc(doc.id)}
-                                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 text-xs px-2 py-1 rounded transition-all flex-shrink-0 hover:bg-red-500/10">
-                                    🗑️
+                                    className="absolute -top-3 -right-3 opacity-0 group-hover:opacity-100 bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full shadow-lg border-2 border-[#0a0f1e] hover:bg-red-600 transition-all z-10">
+                                    ✕
                                 </button>
                             </div>
                         </div>
