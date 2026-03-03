@@ -32,6 +32,7 @@ export default function BroadcastPage() {
     const [body, setBody] = useState('')
     const [filterProgramme, setFilterProgramme] = useState('Tous')
     const [filterOptIn, setFilterOptIn] = useState(true)
+    const [errorMsg, setErrorMsg] = useState('')
 
     useEffect(() => { loadCampaigns() }, [])
 
@@ -65,9 +66,13 @@ export default function BroadcastPage() {
             const data = await res.json()
             if (data.ok) {
                 setShowCreate(false)
-                setName(''); setBody(''); setEstimate(null)
+                setName(''); setBody(''); setEstimate(null); setErrorMsg('')
                 loadCampaigns()
+            } else {
+                setErrorMsg(data.error || 'Erreur lors de la création')
             }
+        } catch (err: any) {
+            setErrorMsg(err.message || 'Erreur de connexion serveur')
         } finally {
             setSending(false)
         }
@@ -143,6 +148,12 @@ export default function BroadcastPage() {
                         <span>⚠️</span>
                         <span>L'envoi respecte un rate-limit de 1 message/1-2s pour éviter les blocages WhatsApp.</span>
                     </div>
+
+                    {errorMsg && (
+                        <div className="text-sm font-medium text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-500/20">
+                            X {errorMsg}
+                        </div>
+                    )}
 
                     <div className="flex gap-3">
                         <button onClick={createCampaign} disabled={sending || !name || !body}
