@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/wasender/client'
+import { waitUntil } from '@vercel/functions'
 
 export async function POST(req: NextRequest) {
     const { name, body, filterProgramme, filterOptIn } = await req.json()
@@ -45,8 +46,8 @@ export async function POST(req: NextRequest) {
     }))
     await supabase.from('broadcast_recipients').insert(recipientRows)
 
-    // Envoi rate-limité en background (ne pas bloquer la réponse)
-    sendBroadcastAsync(campaign.id, body, recipients.map(r => r.chat_id), supabase)
+    // Envoi rate-limité en background (protégé contre la coupure Serverless Vercel)
+    waitUntil(sendBroadcastAsync(campaign.id, body, recipients.map(r => r.chat_id), supabase))
 
     return NextResponse.json({ ok: true, campaignId: campaign.id, total: recipients.length })
 }
