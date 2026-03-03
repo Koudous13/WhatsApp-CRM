@@ -181,7 +181,6 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         }
 
         let callCount = 0
-        let traceOutilsInfos = ""
 
         // DUMP LOG DE DÉBOGAGE
         await supabase.from('ai_logs').insert({
@@ -207,7 +206,6 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
                     const toolCall: any = toolCallRaw;
                     const functionName = toolCall.function.name;
                     const functionArgs = JSON.parse(toolCall.function.arguments);
-                    traceOutilsInfos += ` [TOOL: ${functionName}] `;
 
                     try {
                         const apiResponse = await executeToolCall(supabase, from, functionName, functionArgs);
@@ -218,7 +216,7 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
                             content: JSON.stringify(apiResponse),
                         });
                     } catch (err: any) {
-                        traceOutilsInfos += ` [ERR_TOOL: ${err.toString()}] `;
+                        console.error('Erreur Tool Calling:', err);
                         messagesContext.push({
                             tool_call_id: toolCall.id,
                             role: "tool",
@@ -233,8 +231,7 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
                 break;
             }
         }
-
-        if (traceOutilsInfos !== "") { aiResponse += "\n\n(Debug Tools :" + traceOutilsInfos + ")" }
+        // FIN DE LA BOUCLE DEEPSEEK
 
     } catch (err: any) {
         console.error("Agent error:", err)
