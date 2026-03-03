@@ -43,8 +43,8 @@ const tools: any = [
     {
         type: "function",
         function: {
-            name: "create_crm_profile",
-            description: "Utiliser au TOUT PREMIER CONTACT uniquement. Crée un nouveau prospect en base de données.",
+            name: "manage_crm_profile",
+            description: "OBLIGATOIRE au premier contact dès qu'on connait le prénom OU dès que le prospect donne des infos (âge, developpement web, niveau). Insère ou met à jour le profil dans la base.",
             parameters: {
                 type: "object",
                 properties: {
@@ -52,26 +52,7 @@ const tools: any = [
                     nom: { type: "string" },
                     age: { type: "string" },
                     profil_type: { type: "string", description: '\"Enfant\", \"Parent\", \"Pro\", \"Etudiant\"' },
-                    interet_principal: { type: "string" },
-                    objectif: { type: "string" },
-                    notes: { type: "string" }
-                },
-                required: []
-            }
-        }
-    },
-    {
-        type: "function",
-        function: {
-            name: "update_crm_profile",
-            description: "Utiliser dès le 2ème message. Met à jour les informations du prospect existant.",
-            parameters: {
-                type: "object",
-                properties: {
-                    prenom: { type: "string" },
-                    age: { type: "string" },
-                    profil_type: { type: "string" },
-                    interet_principal: { type: "string" },
+                    interet_principal: { type: "string", description: 'Ex: Developpement web' },
                     niveau_actuel: { type: "string" },
                     disponibilite: { type: "string" },
                     objectif: { type: "string" },
@@ -116,7 +97,7 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
         return { result: text || "Aucune information trouvée." }
     }
 
-    if (name === 'create_crm_profile' || name === 'update_crm_profile') {
+    if (name === 'manage_crm_profile') {
         const { data: contact } = await supabase.from('Profil_Prospects').select('nombre_interactions').eq('chat_id', from).single()
 
         await supabase.from('Profil_Prospects').upsert({
