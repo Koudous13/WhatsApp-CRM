@@ -201,9 +201,10 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         const chatModel = genAI.getGenerativeModel({
             model: 'gemini-2.5-flash',
             systemInstruction: fullSystemPrompt,
-            tools: tools
+            tools: tools, toolConfig: { functionCallingConfig: { mode: "AUTO" } }
         })
         const chat = chatModel.startChat({ history: historyFormatted })
+
 
 
         let result = await chat.sendMessage(text)
@@ -237,6 +238,7 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
 
         aiResponse = result.response.text()
         if (traceOutilsInfos !== "") { aiResponse += "\n\n(Debug Tools :" + traceOutilsInfos + ")" }
+
 
 
     } catch (err: any) {
