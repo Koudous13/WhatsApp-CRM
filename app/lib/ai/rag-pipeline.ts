@@ -171,9 +171,14 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     try {
         let messagesContext: any[] = [
             { role: 'system', content: fullSystemPrompt },
-            ...historyFormatted,
-            { role: 'user', content: text }
+            ...historyFormatted
         ];
+
+        // ANTI-DOUBLON DEEPSEEK : Deepseek perd sa capacité à appeler des outils 
+        // si on lui passe deux fois exactement le même message avec le rôle "user" à la fin du tableau.
+        if (messagesContext.length === 1 || messagesContext[messagesContext.length - 1].content !== text) {
+            messagesContext.push({ role: 'user', content: text });
+        }
 
         let callCount = 0
         let traceOutilsInfos = ""
