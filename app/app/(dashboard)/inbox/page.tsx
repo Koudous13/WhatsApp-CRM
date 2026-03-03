@@ -39,6 +39,7 @@ export default function InboxPage() {
     const [replyText, setReplyText] = useState('')
     const [sending, setSending] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    const [handingOver, setHandingOver] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     // Charger conversations
@@ -97,6 +98,23 @@ export default function InboxPage() {
             setReplyText('')
         } finally {
             setSending(false)
+        }
+    }
+
+    async function handoverToAI() {
+        if (!selected) return
+        setHandingOver(true)
+        try {
+            await fetch('/api/messages/handover', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ conversationId: selected.id }),
+            })
+            setSelected({ ...selected, status: 'ai_active' })
+        } catch (err) {
+            console.error('Erreur Handover', err)
+        } finally {
+            setHandingOver(false)
         }
     }
 
@@ -209,6 +227,15 @@ export default function InboxPage() {
                             <span className="badge ml-2" style={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
                                 {selected.status?.replace('_', ' ')}
                             </span>
+                            {selected.status !== 'ai_active' && (
+                                <button
+                                    onClick={handoverToAI}
+                                    disabled={handingOver}
+                                    className="ml-4 px-3 py-1 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-full text-xs hover:bg-purple-600/30 transition-colors"
+                                >
+                                    {handingOver ? '...Activation...' : '🤖 Rendre à l\'IA'}
+                                </button>
+                            )}
                         </div>
                     </div>
 
