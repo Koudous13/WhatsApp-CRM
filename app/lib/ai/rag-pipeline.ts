@@ -37,11 +37,19 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
 
     // ─── [2] RECHERCHE VECTORIELLE (table: documents) ────────────────
     const similarityThreshold = 0.60
-    const { data: chunks } = await supabase.rpc('match_documents', {
-        query_embedding: queryEmbedding,
-        match_threshold: similarityThreshold,
-        match_count: 5,
-    })
+
+    let chunks: any = []
+    try {
+        const { data } = await supabase.rpc('match_documents', {
+            query_embedding: queryEmbedding,
+            match_threshold: similarityThreshold,
+            match_count: 5,
+        })
+        chunks = data
+    } catch (dbErr) {
+        await sendWhatsAppMessage(from, "[DEBUG] Erreur DB Match Documents: " + String(dbErr).substring(0, 200))
+        throw dbErr
+    }
 
     // ─── [3] HISTORIQUE DE CONVERSATION ─────────────────────────────
     const { data: history } = await supabase
@@ -96,9 +104,16 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         const chat = chatModel.startChat({ history: historyFormatted })
         const result = await chat.sendMessage(text)
         aiResponse = result.response.text()
-    } catch {
-        aiResponse = await fallbackOpenAI(fullSystemPrompt, historyFormatted, text)
-        modelUsed = 'gpt-4o-mini'
+    } catch (geminiError) {
+        console.error("Gemini failed, trying OpenAI:", geminiError)
+        try {
+            aiResponse = await fallbackOpenAI(fullSystemPrompt, historyFormatted, text)
+            modelUsed = 'gpt-4o-mini'
+        } catch (openAiError) {
+            console.error("OpenAI Fallback failed:", openAiError)
+            await sendWhatsAppMessage(from, "[DEBUG] Erreur IA Globale:\nGemini: " + String(geminiError).substring(0, 100) + "\nOpenAI: " + String(openAiError).substring(0, 100))
+            throw openAiError
+        }
     }
 
     // ─── [7] PROFILAGE SILENCIEUX ────────────────────────────────────
@@ -204,6 +219,11 @@ async function fallbackOpenAI(
         },
         body: JSON.stringify({ model: 'gpt-4o-mini', messages, max_tokens: 500, temperature: 0.7 }),
     })
+
+    if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(`OpenAI API status ${res.status}: ${errText}`)
+    }
 
     const data = await res.json()
     return data.choices?.[0]?.message?.content ?? "Je rencontre un problème technique, veuillez réessayer."
