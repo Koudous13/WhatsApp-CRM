@@ -197,6 +197,13 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         let callCount = 0
         let traceOutilsInfos = ""
 
+        // DUMP LOG DE DÉBOGAGE
+        await supabase.from('ai_logs').insert({
+            contact_chat_id: from,
+            system_prompt: JSON.stringify(messagesContext, null, 2),
+            user_message: "DUMP CONTEXTE DEEPSEEK"
+        })
+
         while (callCount < 4) {
             const response = await openai.chat.completions.create({
                 model: "deepseek-chat",
