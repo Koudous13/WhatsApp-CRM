@@ -37,6 +37,12 @@ export default function ContactsPage() {
     const [filterProgramme, setFilterProgramme] = useState('Tous')
     const [filterStatut, setFilterStatut] = useState('Tous')
     const [loading, setLoading] = useState(true)
+    const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban')
+    const [draggingId, setDraggingId] = useState<number | null>(null)
+    const [updatingId, setUpdatingId] = useState<number | null>(null)
+
+    // Colonnes du Kanban
+    const KANBAN_COLUMNS = ['Nouveau', 'Qualifie', 'Interesse', 'Proposition faite', 'Inscription', 'Froid']
 
     useEffect(() => {
         load()
@@ -61,6 +67,52 @@ export default function ContactsPage() {
         return matchSearch && matchProg && matchStatut
     })
 
+    // Handler Drag & Drop
+    const handleDragStart = (e: React.DragEvent, id: number) => {
+        setDraggingId(id)
+        e.dataTransfer.setData('text/plain', id.toString())
+        e.dataTransfer.effectAllowed = 'move'
+    }
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault() // Nécessaire pour autoriser le drop
+        e.dataTransfer.dropEffect = 'move'
+    }
+
+    const handleDrop = async (e: React.DragEvent, newStatus: string) => {
+        e.preventDefault()
+        const idStr = e.dataTransfer.getData('text/plain')
+        if (!idStr) return
+        const id = parseInt(idStr, 10)
+
+        // Trouver le prospect
+        const prospect = prospects.find(p => p.id === id)
+        if (!prospect || prospect.statut_conversation === newStatus) {
+            setDraggingId(null)
+            return
+        }
+
+        // Optimistic UI Update
+        setUpdatingId(id)
+        setProspects(prev => prev.map(p => p.id === id ? { ...p, statut_conversation: newStatus } : p))
+        setDraggingId(null)
+
+        // Supabase DB Update
+        try {
+            const { error } = await supabase
+                .from('Profil_Prospects')
+                .update({ statut_conversation: newStatus })
+                .eq('id', id)
+            if (error) throw error
+        } catch (err) {
+            console.error('Erreur Drag&Drop', err)
+            // Rollback si erreur (recharger tout)
+            load()
+        } finally {
+            setUpdatingId(null)
+        }
+    }
+
     return (
         <div className="flex h-screen">
             {/* ── Liste contacts ─────────────────────────────────────── */}
@@ -69,7 +121,13 @@ export default function ContactsPage() {
                 <div className="p-6 border-b" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h1 className="text-xl font-bold text-white">Contacts</h1>
+                            <h1 className="text-xl font-bold text-white flex items-center gap-3">
+                                Contacts
+                                <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
+                                    <button onClick={() => setViewMode('kanban')} className={cn("px-3 py-1 text-xs font-bold rounded-md transition-all", viewMode === 'kanban' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>Kanban</button>
+                                    <button onClick={() => setViewMode('list')} className={cn("px-3 py-1 text-xs font-bold rounded-md transition-all", viewMode === 'list' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>Liste</button>
+                                </div>
+                            </h1>
                             <p className="text-sm text-slate-400">{prospects.length} prospects</p>
                         </div>
                     </div>
@@ -93,87 +151,162 @@ export default function ContactsPage() {
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="flex-1 overflow-y-auto">
+                {/* Contenu principal (Kanban ou Table) */}
+                <div className="flex-1 overflow-hidden flex flex-col">
                     {loading ? (
                         <div className="p-8 text-center text-slate-500">Chargement...</div>
+                    ) : viewMode === 'kanban' ? (
+                        <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 flex gap-4 h-full scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                            {KANBAN_COLUMNS.map(columnStatus => {
+                                const columnProspects = filtered.filter(p => p.statut_conversation === columnStatus)
+                                return (
+                                    <div
+                                        key={columnStatus}
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, columnStatus)}
+                                        className="w-[300px] flex-shrink-0 flex flex-col bg-slate-900/50 rounded-xl border border-slate-800/60"
+                                    >
+                                        <div className="p-3 border-b border-slate-800/60 flex items-center justify-between">
+                                            <h3 className="font-bold text-sm text-slate-200">
+                                                {columnStatus}
+                                            </h3>
+                                            <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold">
+                                                {columnProspects.length}
+                                            </span>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-hide">
+                                            {columnProspects.map(p => {
+                                                const name = p.prenom ? `${p.prenom} ${p.nom ?? ''}`.trim() : p.chat_id
+                                                return (
+                                                    <div
+                                                        key={p.id}
+                                                        draggable
+                                                        onDragStart={(e) => handleDragStart(e, p.id)}
+                                                        onClick={() => setSelected(p)}
+                                                        className={cn(
+                                                            "glass-card p-4 rounded-lg cursor-grab active:cursor-grabbing border border-slate-700/50 hover:border-blue-500/50 transition-all",
+                                                            draggingId === p.id ? "opacity-40 border-dashed" : "opacity-100",
+                                                            updatingId === p.id ? "animate-pulse" : ""
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3 mb-3">
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-lg">
+                                                                {getInitials(p.prenom ?? undefined, p.nom ?? undefined)}
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="font-bold text-white text-sm truncate">{name}</p>
+                                                                <p className="text-xs text-slate-400 truncate tracking-wide">{p.chat_id}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-2" title="Score d'engagement">
+                                                            <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mb-1">
+                                                                <div className="h-full rounded-full transition-all"
+                                                                    style={{
+                                                                        width: `${p.score_engagement}%`,
+                                                                        background: p.score_engagement >= 80 ? '#34d399' : p.score_engagement >= 50 ? '#fbbf24' : '#64748b'
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex justify-between items-center mt-1.5">
+                                                                <span className="text-[10px] font-bold text-slate-400 px-1.5 py-0.5 bg-slate-800 rounded">
+                                                                    {p.programme_recommande ?? '—'}
+                                                                </span>
+                                                                <div className="flex gap-1.5">
+                                                                    {p.score_engagement >= 80 && <span title="Chaud" className="text-xs drop-shadow-md">🔥</span>}
+                                                                    {p.niveau_urgence === 'Élevé' && <span title="Urgent" className="text-xs drop-shadow-md">🚨</span>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
                     ) : (
-                        <table className="w-full text-sm">
-                            <thead className="sticky top-0" style={{ background: 'rgba(10, 15, 30, 0.95)' }}>
-                                <tr className="text-slate-400 text-xs uppercase">
-                                    <th className="text-left px-6 py-3">Contact</th>
-                                    <th className="text-left px-4 py-3">Programme</th>
-                                    <th className="text-left px-4 py-3">Statut</th>
-                                    <th className="text-left px-4 py-3">Score</th>
-                                    <th className="text-left px-4 py-3">Interactions</th>
-                                    <th className="text-left px-4 py-3">Urgence</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filtered.map(p => {
-                                    const name = p.prenom ? `${p.prenom} ${p.nom ?? ''}`.trim() : p.chat_id
-                                    return (
-                                        <tr key={p.id}
-                                            onClick={() => setSelected(p)}
-                                            className="border-b cursor-pointer group hover:bg-white/5 transition-colors relative"
-                                            style={{ borderColor: 'rgba(30, 58, 95, 0.3)' }}>
-                                            <td className="px-6 py-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600
-                            flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                                                        {getInitials(p.prenom ?? undefined, p.nom ?? undefined)}
+                        <div className="flex-1 overflow-y-auto">
+                            <table className="w-full text-sm">
+                                <thead className="sticky top-0" style={{ background: 'rgba(10, 15, 30, 0.95)', zIndex: 10 }}>
+                                    <tr className="text-slate-400 text-xs uppercase">
+                                        <th className="text-left px-6 py-3">Contact</th>
+                                        <th className="text-left px-4 py-3">Programme</th>
+                                        <th className="text-left px-4 py-3">Statut</th>
+                                        <th className="text-left px-4 py-3">Score</th>
+                                        <th className="text-left px-4 py-3">Interactions</th>
+                                        <th className="text-left px-4 py-3">Urgence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.map(p => {
+                                        const name = p.prenom ? `${p.prenom} ${p.nom ?? ''}`.trim() : p.chat_id
+                                        return (
+                                            <tr key={p.id}
+                                                onClick={() => setSelected(p)}
+                                                className="border-b cursor-pointer group hover:bg-white/5 transition-colors relative"
+                                                style={{ borderColor: 'rgba(30, 58, 95, 0.3)' }}>
+                                                <td className="px-6 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600
+                                flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                                                            {getInitials(p.prenom ?? undefined, p.nom ?? undefined)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-white">{name}</p>
+                                                            <p className="text-xs text-slate-500">{p.chat_id}</p>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="font-medium text-white">{name}</p>
-                                                        <p className="text-xs text-slate-500">{p.chat_id}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
-                                                    {p.programme_recommande ?? '—'}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className={`badge ${getStatutColor(p.statut_conversation)}`}>
-                                                    {p.statut_conversation}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-16 h-2 rounded-full bg-slate-800 overflow-hidden">
-                                                        <div className="h-full rounded-full transition-all"
-                                                            style={{
-                                                                width: `${p.score_engagement}%`,
-                                                                background: p.score_engagement >= 80 ? '#34d399' : p.score_engagement >= 50 ? '#fbbf24' : '#64748b'
-                                                            }} />
-                                                    </div>
-                                                    <span className={`font-bold text-xs ${getScoreColor(p.score_engagement)}`}>
-                                                        {p.score_engagement}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
+                                                        {p.programme_recommande ?? '—'}
                                                     </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-400">{p.nombre_interactions}</td>
-                                            <td className="px-4 py-3 relative">
-                                                {p.niveau_urgence && (
-                                                    <span className={`text-xs ${p.niveau_urgence === 'Élevé' ? 'text-red-400' : p.niveau_urgence === 'Moyen' ? 'text-amber-400' : 'text-slate-500'}`}>
-                                                        {p.niveau_urgence === 'Élevé' ? '🔴' : p.niveau_urgence === 'Moyen' ? '🟡' : '🟢'} {p.niveau_urgence}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`badge ${getStatutColor(p.statut_conversation)}`}>
+                                                        {p.statut_conversation}
                                                     </span>
-                                                )}
-                                                {/* Hover Action */}
-                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <a href={`/inbox?chat_id=${p.chat_id}`}
-                                                        className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/40 hover:bg-blue-500 hover:text-white flex items-center justify-center transition-all shadow-lg"
-                                                        onClick={(e) => e.stopPropagation()}>
-                                                        💬
-                                                    </a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-16 h-2 rounded-full bg-slate-800 overflow-hidden">
+                                                            <div className="h-full rounded-full transition-all"
+                                                                style={{
+                                                                    width: `${p.score_engagement}%`,
+                                                                    background: p.score_engagement >= 80 ? '#34d399' : p.score_engagement >= 50 ? '#fbbf24' : '#64748b'
+                                                                }} />
+                                                        </div>
+                                                        <span className={`font-bold text-xs ${getScoreColor(p.score_engagement)}`}>
+                                                            {p.score_engagement}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-400">{p.nombre_interactions}</td>
+                                                <td className="px-4 py-3 relative">
+                                                    {p.niveau_urgence && (
+                                                        <span className={`text-xs ${p.niveau_urgence === 'Élevé' ? 'text-red-400' : p.niveau_urgence === 'Moyen' ? 'text-amber-400' : 'text-slate-500'}`}>
+                                                            {p.niveau_urgence === 'Élevé' ? '🔴' : p.niveau_urgence === 'Moyen' ? '🟡' : '🟢'} {p.niveau_urgence}
+                                                        </span>
+                                                    )}
+                                                    {/* Hover Action */}
+                                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <a href={`/inbox?chat_id=${p.chat_id}`}
+                                                            className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/40 hover:bg-blue-500 hover:text-white flex items-center justify-center transition-all shadow-lg"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                // Le lien natif gérera la navigation
+                                                            }}>
+                                                            💬
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
             </div>
