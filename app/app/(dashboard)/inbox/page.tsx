@@ -39,6 +39,7 @@ export default function InboxPage() {
     const [replyText, setReplyText] = useState('')
     const [sending, setSending] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    const [activeTab, setActiveTab] = useState<'action' | 'ai' | 'closed'>('action')
     const [handingOver, setHandingOver] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -147,9 +148,28 @@ export default function InboxPage() {
         }
     }
 
+    async function takeoverFromAI() {
+        if (!selected) return
+        setHandingOver(true)
+        try {
+            await supabase.from('conversations').update({ status: 'assigned' }).eq('id', selected.id)
+            setSelected({ ...selected, status: 'assigned' })
+        } catch (err) {
+            console.error('Erreur Takeover', err)
+        } finally {
+            setHandingOver(false)
+        }
+    }
+
     const filtered = conversations.filter(c => {
         const name = `${c.Profil_Prospects?.prenom ?? ''} ${c.Profil_Prospects?.nom ?? ''} ${c.contact_chat_id}`.toLowerCase()
-        return name.includes(searchQuery.toLowerCase())
+        if (!name.includes(searchQuery.toLowerCase())) return false
+
+        // Filtrage par onglet (Smart Routing)
+        if (activeTab === 'action') return c.status === 'escalated' || c.status === 'assigned'
+        if (activeTab === 'ai') return c.status === 'ai_active'
+        if (activeTab === 'closed') return c.status === 'resolved'
+        return true
     })
 
     const statusColors: Record<string, string> = {
@@ -169,9 +189,21 @@ export default function InboxPage() {
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Rechercher..."
-                        className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
                         style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
                     />
+                    {/* Smart Routing Tabs */}
+                    <div className="flex p-1 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                        <button onClick={() => setActiveTab('action')} className={cn("flex-1 text-[10px] font-bold py-1.5 rounded-md transition-all truncate px-1", activeTab === 'action' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>
+                            🔴 ACTION ({conversations.filter(c => c.status === 'escalated' || c.status === 'assigned').length})
+                        </button>
+                        <button onClick={() => setActiveTab('ai')} className={cn("flex-1 text-[10px] font-bold py-1.5 rounded-md transition-all truncate px-1", activeTab === 'ai' ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white")}>
+                            🤖 IA ({conversations.filter(c => c.status === 'ai_active').length})
+                        </button>
+                        <button onClick={() => setActiveTab('closed')} className={cn("flex-1 text-[10px] font-bold py-1.5 rounded-md transition-all truncate px-1", activeTab === 'closed' ? "bg-slate-600 text-white shadow" : "text-slate-400 hover:text-white")}>
+                            ☑️ CLOS
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
@@ -200,8 +232,15 @@ export default function InboxPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm font-medium text-white truncate">{name}</span>
-                                            <span className="text-xs text-slate-500 flex-shrink-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-sm font-medium text-white truncate">{name}</span>
+                                                {(pp?.score_engagement ?? 0) >= 80 ? (
+                                                    <span title="Lead Chaud" className="text-xs">🔥</span>
+                                                ) : (pp?.score_engagement ?? 0) < 30 ? (
+                                                    <span title="Lead Froid" className="text-xs">❄️</span>
+                                                ) : null}
+                                            </div>
+                                            <span className="text-[10px] text-slate-500 flex-shrink-0">
                                                 {formatRelativeDate(conv.last_message_at)}
                                             </span>
                                         </div>
@@ -257,17 +296,36 @@ export default function InboxPage() {
                                 <span className="badge ml-2" style={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>
                                     {selected.status?.replace('_', ' ')}
                                 </span>
-                                {selected.status !== 'ai_active' && (
+                                {selected.status !== 'ai_active' && selected.status !== 'resolved' && (
                                     <button
                                         onClick={handoverToAI}
                                         disabled={handingOver}
-                                        className="ml-4 px-3 py-1 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-full text-xs hover:bg-purple-600/30 transition-colors"
+                                        className="ml-4 px-3 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs hover:bg-emerald-600/30 transition-colors font-bold flex items-center gap-1"
                                     >
-                                        {handingOver ? '...Activation...' : '🤖 Rendre à l\'IA'}
+                                        {handingOver ? '...' : '🤖 Confier à l\'IA'}
+                                    </button>
+                                )}
+                                {selected.status === 'ai_active' && (
+                                    <button
+                                        onClick={takeoverFromAI}
+                                        disabled={handingOver}
+                                        className="ml-4 px-3 py-1 bg-red-600/20 text-red-400 border border-red-500/30 rounded-full text-xs hover:bg-red-600/30 transition-colors font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(239,68,68,0.2)] hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                                    >
+                                        {handingOver ? '...' : '🛑 Takeover (Pause IA)'}
                                     </button>
                                 )}
                             </div>
                         </div>
+
+                        {/* Bandeau d'Avertissement Takeover */}
+                        {(selected.status === 'assigned' || selected.status === 'escalated') && (
+                            <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center gap-3">
+                                <span className="text-amber-500">⚠️</span>
+                                <p className="text-xs text-amber-500 font-medium">
+                                    L'IA est actuellement en pause sur cette conversation. Le prospect attend une intervention humaine.
+                                </p>
+                            </div>
+                        )}
 
                         {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -320,11 +378,30 @@ export default function InboxPage() {
                                     style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
                                 />
                                 <button onClick={sendReply} disabled={sending || !replyText.trim()}
-                                    className="btn-primary px-4 self-end flex items-center gap-2">
+                                    className="btn-primary px-4 self-end flex items-center gap-2 font-bold">
                                     {sending ? '...' : '→ Envoyer'}
                                 </button>
                             </div>
-                            <p className="text-xs text-slate-600 mt-2">
+
+                            {/* Quick Replies Humaines */}
+                            {(selected.status === 'assigned' || selected.status === 'escalated') && (
+                                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                    <button onClick={() => setReplyText("Bonjour ! Je prends le relais de l'assistant virtuel. Comment puis-je vous aider ?")}
+                                        className="whitespace-nowrap px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700/50 transition-colors">
+                                        👋 Prendre le relais
+                                    </button>
+                                    <button onClick={() => setReplyText("Voici le lien pour finaliser votre inscription : ")}
+                                        className="whitespace-nowrap px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700/50 transition-colors">
+                                        🔗 Lien d'inscription
+                                    </button>
+                                    <button onClick={() => setReplyText("Avez-vous d'autres questions avant de valider votre place ?")}
+                                        className="whitespace-nowrap px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700/50 transition-colors">
+                                        ❓ Autres questions
+                                    </button>
+                                </div>
+                            )}
+
+                            <p className="text-[10px] text-slate-500 mt-2 uppercase tracking-wider font-bold">
                                 💡 En répondant manuellement, vous prenez le contrôle de la conversation (l'IA se tait).
                             </p>
                         </div>
