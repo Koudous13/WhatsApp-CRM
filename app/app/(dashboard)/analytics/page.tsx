@@ -13,6 +13,9 @@ type Stats = {
     topProgrammes: { name: string; count: number }[]
     statuts: { name: string; count: number }[]
     messagesParJour: { date: string; count: number }[]
+    meteo: string
+    funnel: { label: string; count: number; color: string; percentage: number }[]
+    topObjections: { name: string; count: number }[]
 }
 
 function StatCard({ icon, label, value, sub, color = 'text-white', trend }: {
@@ -62,6 +65,7 @@ export default function AnalyticsPage() {
                 { data: programmesData },
                 { data: statutsData },
                 { data: messagesData },
+                { data: objectionsData },
             ] = await Promise.all([
                 supabase.from('Profil_Prospects').select('*', { count: 'exact', head: true }),
                 supabase.from('Profil_Prospects').select('*', { count: 'exact', head: true })
@@ -74,6 +78,7 @@ export default function AnalyticsPage() {
                 supabase.from('Profil_Prospects').select('programme_recommande').not('programme_recommande', 'is', null),
                 supabase.from('Profil_Prospects').select('statut_conversation'),
                 supabase.from('messages').select('created_at').gte('created_at', weekAgo).eq('direction', 'inbound'),
+                supabase.from('Profil_Prospects').select('objections').not('objections', 'is', null).neq('objections', ''),
             ])
 
             const avgScore = scoreData?.length
@@ -107,6 +112,47 @@ export default function AnalyticsPage() {
                 .sort((a, b) => a[0].localeCompare(b[0]))
                 .map(([date, count]) => ({ date, count }))
 
+            // Objections
+            const objCount: Record<string, number> = {}
+            objectionsData?.forEach((r: any) => {
+                const obs = (r.objections as string).split(',').map(s => s.trim().toLowerCase())
+                obs.forEach(o => {
+                    const cleanObj = o.includes('prix') || o.includes('cher') ? 'Prix' :
+                        o.includes('temps') || o.includes('dispo') ? 'Temps / Dispo' :
+                            o.includes('distance') || o.includes('loin') ? 'Distance' :
+                                o.includes('réfléchir') || o.includes('sûr') ? 'Hésitation / Réflexion' : 'Autre'
+                    if (cleanObj !== 'Autre' || obs.length === 1) {
+                        const finalLabel = cleanObj === 'Autre' ? (o.length > 15 ? o.substring(0, 15) + '...' : o) : cleanObj
+                        if (finalLabel.length > 2) {
+                            objCount[finalLabel] = (objCount[finalLabel] || 0) + 1
+                        }
+                    }
+                })
+            })
+            const topObjections = Object.entries(objCount)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 4)
+                .map(([name, count]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), count }))
+
+            // Funnel
+            const getStatutCount = (names: string[]) => statuts.filter(s => names.includes(s.name.toLowerCase() || '')).reduce((a, b) => a + b.count, 0)
+            const cNouveaux = getStatutCount(['nouveau', 'contact', ''])
+            const cQualifies = getStatutCount(['qualifié', 'intéressé'])
+            const cPropos = getStatutCount(['proposition faite', 'proposition'])
+            const cInscrits = getStatutCount(['inscription', 'inscrit', 'client'])
+
+            const totalFunnel = cNouveaux + cQualifies + cPropos + cInscrits || 1
+            const funnel = [
+                { label: 'Nouveaux', count: cNouveaux, color: 'bg-slate-400', percentage: Math.round((cNouveaux / totalFunnel) * 100) },
+                { label: 'Qualifiés', count: cQualifies, color: 'bg-blue-400', percentage: Math.round((cQualifies / totalFunnel) * 100) },
+                { label: 'Propositions', count: cPropos, color: 'bg-purple-400', percentage: Math.round((cPropos / totalFunnel) * 100) },
+                { label: 'Inscrits', count: cInscrits, color: 'bg-emerald-400', percentage: Math.round((cInscrits / totalFunnel) * 100) },
+            ]
+
+            const meteoText = (newToday ?? 0) > 0
+                ? `Bonjour ! Belle dynamique aujourd'hui avec ${newToday} nouveaux leads. L'IA qualifie activement ${conversationsActives} profils.`
+                : `Bonjour ! Journée calme pour l'instant. L'IA surveille les ${conversationsActives} conversations en cours.`
+
             setStats({
                 totalContacts: totalContacts ?? 0,
                 newToday: newToday ?? 0,
@@ -116,6 +162,9 @@ export default function AnalyticsPage() {
                 topProgrammes,
                 statuts,
                 messagesParJour,
+                meteo: meteoText,
+                funnel,
+                topObjections,
             })
             setLoading(false)
         }
@@ -142,12 +191,66 @@ export default function AnalyticsPage() {
                 </div>
             </div>
 
+            {/* Météo Business */}
+            <div className="glass-card p-5 border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-500/10 to-transparent">
+                <div className="flex items-center gap-3">
+                    <span className="text-2xl">🌅</span>
+                    <div>
+                        <h3 className="text-white font-bold text-sm">Météo Business</h3>
+                        <p className="text-slate-400 text-sm mt-1">{stats?.meteo}</p>
+                    </div>
+                </div>
+            </div>
+
             {/* KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard icon="👥" label="Total Contacts" value={stats?.totalContacts ?? 0} trend={{ value: "12%", positive: true }} />
-                <StatCard icon="✨" label="Créés (Période)" value={stats?.newToday ?? 0} color="text-blue-400" trend={{ value: "5%", positive: true }} sub="Contacts opt-in" />
-                <StatCard icon="🤖" label="Sessions IA" value={stats?.conversationsActives ?? 0} color="text-emerald-400" trend={{ value: "3.2%", positive: true }} sub="IA en cours de qualification" />
-                <StatCard icon="⚡" label="Escalades" value={stats?.escalations ?? 0} color="text-amber-400" trend={{ value: "1.5%", positive: false }} sub="En attente d'un humain" />
+                <StatCard icon="👥" label="Base Totale" value={stats?.totalContacts ?? 0} trend={{ value: "+2%", positive: true }} />
+                <StatCard icon="🔥" label="Nouveaux (Aujourd'hui)" value={stats?.newToday ?? 0} color="text-amber-400" trend={{ value: "+1", positive: true }} sub="Leads chauds" />
+                <StatCard icon="🤖" label="Sessions IA" value={stats?.conversationsActives ?? 0} color="text-emerald-400" trend={{ value: "Stable", positive: true }} sub="Qualification auto" />
+                <StatCard icon="⚠️" label="Attente Humain" value={stats?.escalations ?? 0} color="text-red-400" trend={{ value: "-1", positive: true }} sub="Intervention requise" />
+            </div>
+
+            {/* Funnel & Objections */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                {/* Visual Pipeline (Funnel) */}
+                <div className="glass-card p-6 lg:col-span-2">
+                    <p className="text-slate-400 text-sm font-bold mb-6 flex items-center gap-2">🎯 <span className="uppercase tracking-wide">Tunnel de Conversion</span></p>
+                    <div className="flex items-center justify-between w-full h-32 gap-2">
+                        {stats?.funnel.map((step, idx) => (
+                            <div key={idx} className="flex flex-col items-center justify-end h-full flex-1 relative group">
+                                <div className="absolute top-0 text-center opacity-0 group-hover:opacity-100 transition-opacity -mt-4 bg-slate-800 text-xs px-2 py-1 rounded-md z-10 whitespace-nowrap">
+                                    {step.percentage}% du total
+                                </div>
+                                <div className="w-full h-full flex items-end px-1">
+                                    <div
+                                        className={`w-full rounded-t-lg ${step.color} opacity-80 group-hover:opacity-100 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)]`}
+                                        style={{ height: `${Math.max(step.percentage, 10)}%`, minHeight: '20px' }}
+                                    ></div>
+                                </div>
+                                <div className="mt-3 text-center">
+                                    <p className="text-white font-black text-xl">{step.count}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{step.label}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Top Objections */}
+                <div className="glass-card p-6 flex flex-col">
+                    <p className="text-slate-400 text-sm font-bold mb-5 flex items-center gap-2">🛡️ <span className="uppercase tracking-wide">Top Objections</span></p>
+                    <div className="flex-1 space-y-4">
+                        {stats?.topObjections.length === 0 && <p className="text-slate-500 text-sm text-center">Aucune objection recensée.</p>}
+                        {stats?.topObjections.map((obj, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-slate-800/40 border border-slate-700/50 hover:bg-slate-700/50 transition-colors">
+                                <span className="text-slate-200 text-sm font-medium">{obj.name}</span>
+                                <span className="text-red-400 font-bold bg-red-500/10 px-2 py-0.5 rounded-md text-xs">{obj.count}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

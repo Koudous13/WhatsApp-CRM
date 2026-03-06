@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
-export default function HomePage() {
-  redirect('/inbox')
+export default function Home() {
+  redirect('/analytics')
 }
