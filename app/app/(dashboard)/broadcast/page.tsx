@@ -50,10 +50,14 @@ export default function BroadcastPage() {
 
     // Formulaire
     const [name, setName] = useState('')
-    const [body, setBody] = useState('')
+    const [bodyA, setBodyA] = useState('')
+    const [bodyB, setBodyB] = useState('')
+    const [activeVariant, setActiveVariant] = useState<'A' | 'B'>('A')
     const [filterProgramme, setFilterProgramme] = useState('Tous')
     const [filterOptIn, setFilterOptIn] = useState(true)
     const [errorMsg, setErrorMsg] = useState('')
+
+    const currentBody = activeVariant === 'A' ? bodyA : bodyB
 
     useEffect(() => { loadCampaigns() }, [])
 
@@ -76,18 +80,19 @@ export default function BroadcastPage() {
     }
 
     async function createCampaign() {
-        if (!name.trim() || !body.trim()) return
+        // Pour l'instant l'API ne prend qu'un seul body, on envoie la variante active (ou on pourrait concaténer)
+        if (!name.trim() || !currentBody.trim()) return
         setSending(true)
         try {
             const res = await fetch('/api/broadcast/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, body, filterProgramme, filterOptIn }),
+                body: JSON.stringify({ name, body: currentBody, filterProgramme, filterOptIn }),
             })
             const data = await res.json()
             if (data.ok) {
                 setShowCreate(false)
-                setName(''); setBody(''); setEstimate(null); setErrorMsg('')
+                setName(''); setBodyA(''); setBodyB(''); setEstimate(null); setErrorMsg('')
                 loadCampaigns()
             } else {
                 setErrorMsg(data.error || 'Erreur lors de la création')
@@ -137,7 +142,7 @@ export default function BroadcastPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-slate-400 mb-2">Filtrer par programme</label>
+                                <label className="block text-xs text-slate-400 mb-2">Filtrer par programme (Audience)</label>
                                 <select value={filterProgramme} onChange={e => { setFilterProgramme(e.target.value); setEstimate(null) }}
                                     className="w-full px-3 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}>
@@ -146,17 +151,57 @@ export default function BroadcastPage() {
                             </div>
                         </div>
 
+                        {/* Smart Segments */}
                         <div>
-                            <label className="block text-xs text-slate-400 mb-2">Message * ({body.length}/1024 caractères)</label>
-                            <textarea value={body} onChange={e => setBody(e.target.value.slice(0, 1024))}
-                                placeholder="Bonjour ! 🎉 BloLab vous invite à..."
+                            <label className="block text-xs text-slate-400 mb-2">⚡ Smart Segments (Raccourcis)</label>
+                            <div className="flex gap-2 flex-wrap">
+                                <button onClick={() => { setFilterProgramme('Tous'); setEstimate(null) }}
+                                    className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full text-xs hover:bg-blue-500/30 transition-colors">
+                                    🌍 Tous les inscrits
+                                </button>
+                                <button onClick={() => { setFilterProgramme('ClassTech'); setEstimate(null) }}
+                                    className="px-3 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-full text-xs hover:bg-purple-500/30 transition-colors">
+                                    🎓 ClassTech Only
+                                </button>
+                                <button onClick={() => { setFilterProgramme('Ecole229'); setEstimate(null) }}
+                                    className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs hover:bg-emerald-500/30 transition-colors">
+                                    💻 Ecole229 Only
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* A/B Testing Message Area */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-xs text-slate-400">Message (A/B Testing)</label>
+                                <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
+                                    <button onClick={() => setActiveVariant('A')}
+                                        className={activeVariant === 'A' ? "px-3 py-1 text-[10px] font-bold rounded bg-blue-600 text-white shadow" : "px-3 py-1 text-[10px] font-bold rounded text-slate-400 hover:text-white"}>
+                                        Version A
+                                    </button>
+                                    <button onClick={() => setActiveVariant('B')}
+                                        className={activeVariant === 'B' ? "px-3 py-1 text-[10px] font-bold rounded bg-purple-600 text-white shadow" : "px-3 py-1 text-[10px] font-bold rounded text-slate-400 hover:text-white"}>
+                                        Version B
+                                    </button>
+                                </div>
+                            </div>
+
+                            <textarea
+                                value={activeVariant === 'A' ? bodyA : bodyB}
+                                onChange={e => activeVariant === 'A' ? setBodyA(e.target.value.slice(0, 1024)) : setBodyB(e.target.value.slice(0, 1024))}
+                                placeholder={activeVariant === 'A' ? "Bonjour ! 🎉 BloLab vous invite à..." : "Salut ! Ne manque pas notre prochain événement..."}
                                 rows={6}
-                                className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none font-mono"
-                                style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
+                                className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none font-mono transition-colors"
+                                style={{ background: 'rgba(15, 23, 42, 0.8)', border: `1px solid ${activeVariant === 'A' ? 'rgba(37,99,235,0.5)' : 'rgba(147,51,234,0.5)'}` }}
                             />
-                            <p className="text-[10px] text-slate-500 mt-1">
-                                Astuce: *gras*, _italique_
-                            </p>
+                            <div className="flex justify-between items-center mt-1">
+                                <p className="text-[10px] text-slate-500">
+                                    Astuce: *gras*, _italique_
+                                </p>
+                                <p className="text-[10px] text-slate-500">
+                                    {currentBody.length}/1024 caractères
+                                </p>
+                            </div>
                         </div>
 
                         <div className="flex items-center gap-4 bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
@@ -178,12 +223,12 @@ export default function BroadcastPage() {
                         )}
 
                         <div className="flex gap-3 pt-2">
-                            <button onClick={createCampaign} disabled={sending || !name.trim() || !body.trim()}
+                            <button onClick={createCampaign} disabled={sending || !name.trim() || !currentBody.trim()}
                                 className="btn-primary flex items-center gap-2 font-bold shadow-lg shadow-blue-500/20">
-                                {sending ? '⏳ Lancement...' : '🚀 Lancer la campagne'}
+                                {sending ? '⏳ Lancement...' : `🚀 Lancer la Version ${activeVariant}`}
                             </button>
                             <button onClick={() => setShowCreate(false)}
-                                className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors bg-white/5 rounded-xl">
+                                className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors bg-white/5 rounded-xl border border-white/10">
                                 Annuler
                             </button>
                         </div>
@@ -208,16 +253,20 @@ export default function BroadcastPage() {
                                 style={{ backgroundImage: 'radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px)', backgroundSize: '12px 12px' }}>
 
                                 <div className="text-center mb-4 text-[10px] opacity-70">
-                                    <span className="bg-[#e1f2fb] text-[#111] px-3 py-1 rounded-lg">Aujourd'hui</span>
+                                    <span className="bg-[#e1f2fb] text-[#111] px-3 py-1 rounded-lg shadow-sm">Aujourd'hui</span>
                                 </div>
 
                                 {/* Bulle Sortante */}
-                                <div className="bg-[#dcf8c6] text-[#111] p-2.5 rounded-xl rounded-tr-sm shadow-sm max-w-[85%] ml-auto text-[13px] relative leading-[1.4]">
+                                <div className="bg-[#dcf8c6] text-[#111] p-2.5 rounded-xl rounded-tr-sm shadow-sm max-w-[85%] ml-auto text-[13px] relative leading-[1.4] animate-fadeIn">
+                                    {/* Petit badge variant */}
+                                    <div className="absolute -top-3 -right-2 bg-slate-800 text-white text-[9px] font-bold px-1.5 rounded border border-slate-600 shadow-xl z-20">
+                                        VAR {activeVariant}
+                                    </div>
                                     <p className="whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word' }}>
-                                        {body.trim() ? formatWhatsAppText(body) : <span className="text-slate-500 italic">Testez votre message ici...</span>}
+                                        {currentBody.trim() ? formatWhatsAppText(currentBody) : <span className="text-slate-500 italic">Testez votre message {activeVariant} ici...</span>}
                                     </p>
-                                    <div className="text-[10px] text-[#222]/50 text-right mt-1.5 flex items-center justify-end gap-1 font-medium">
-                                        12:00 <span className="text-[#53bdeb] text-sm leading-none">✓✓</span>
+                                    <div className="text-[10px] text-[#222]/50 text-right mt-1.5 flex items-center justify-end gap-1 font-medium z-10">
+                                        12:00 <span className="text-[#53bdeb] text-sm leading-none drop-shadow-sm">✓✓</span>
                                     </div>
                                 </div>
                             </div>
