@@ -221,11 +221,6 @@ export default function BroadcastPage() {
       finally { setSending(false) }
     }
 
-    function resetForm() {
-      setName(''); setStep(1); setVariants([{ id: '1', body: '', ratio: 100 }]); 
-      setCsvData([]); setFilterProgramme([]); setEstimate(null); setScheduledAt('')
-    }
-
     return (
         <div className="h-full flex flex-col p-1 sm:p-4 lg:p-8 max-w-[1600px] mx-auto space-y-8 overflow-hidden">
             
