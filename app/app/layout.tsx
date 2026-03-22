@@ -1,8 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'BloLab CRM — Agent WhatsApp IA',
@@ -16,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" className="dark">
-      <body className={`${inter.className} bg-[#0a0f1e] text-white min-h-screen`}>
+      <body className="text-white min-h-screen theme-gradient">
         {children}
       </body>
     </html>

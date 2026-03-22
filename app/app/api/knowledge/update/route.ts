@@ -4,30 +4,30 @@ import { generateEmbedding } from '@/lib/ai/embeddings'
 
 export async function POST(req: NextRequest) {
     try {
-        const { content, section } = await req.json()
-        if (!content) return NextResponse.json({ error: 'Contenu requis' }, { status: 400 })
+        const { id, content, metadata } = await req.json()
+        if (!id || !content) return NextResponse.json({ error: 'ID et Contenu requis' }, { status: 400 })
 
+        // 1. Régénérer l'embedding (car le texte a changé)
         const embedding = await generateEmbedding(content)
         
+        // 2. Mise à jour Supabase
         const supabase = createAdminClient()
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('documents')
-            .insert({
+            .update({
                 content,
                 metadata: {
-                    section: section || 'BloLab',
-                    is_active: true,
-                    created_at: new Date().toISOString(),
+                    ...metadata,
+                    updated_at: new Date().toISOString(),
                 },
                 embedding,
             })
-            .select('id')
-            .single()
+            .eq('id', id)
 
         if (error) throw error
-        return NextResponse.json({ ok: true, id: data.id })
+        return NextResponse.json({ ok: true })
     } catch (err: any) {
-        console.error('Erreur add knowledge:', err)
+        console.error('Erreur update knowledge:', err)
         return NextResponse.json({ error: err.message || 'Erreur interne' }, { status: 500 })
     }
 }

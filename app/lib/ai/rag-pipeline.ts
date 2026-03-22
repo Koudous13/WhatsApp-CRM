@@ -1,4 +1,4 @@
-﻿import OpenAI from 'openai'
+import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/wasender/client'
 import { sendTelegramAlert, buildLeadChaudAlert } from '@/lib/notifications/telegram'
@@ -9,19 +9,10 @@ const openai = new OpenAI({
     apiKey: process.env.DEEPSEEK_API_KEY || ''
 })
 
-/** Embedding via fetch REST Gemini v1beta */
-async function getEmbedding(text: string): Promise<number[]> {
-    const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY!
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${key}`
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: { parts: [{ text }] } }),
-    })
-    const json = await res.json() as any
-    if (!res.ok) throw new Error("Gemini embedding error: " + JSON.stringify(json))
-    return json.embedding.values
-}
+import { generateEmbedding } from '@/lib/ai/embeddings'
+
+/** Le pipeline RAG utilise désormais le service d'embedding partagé */
+const getEmbedding = generateEmbedding;
 
 // --- DEFINITION DES OUTILS ----------------------------------------------
 
@@ -80,6 +71,35 @@ const tools: any = [
                 required: ["message"]
             }
         }
+    },
+    {
+        type: "function",
+        function: {
+            name: "register_inscription",
+            description: "APPELER UNIQUEMENT quand TOUS les champs obligatoires ont été collectés pendant la conversation et que le prospect confirme vouloir s'inscrire. Enregistre l'inscription dans la base de données et notifie l'équipe admin.",
+            parameters: {
+                type: "object",
+                properties: {
+                    prenom: { type: "string", description: "Prénom du prospect" },
+                    nom: { type: "string", description: "Nom de famille" },
+                    email: { type: "string", description: "Adresse email" },
+                    age: { type: "string", description: "Âge en années" },
+                    sexe: { type: "string", description: "Masculin ou Féminin" },
+                    nationalite: { type: "string", description: "Nationalité" },
+                    telephone: { type: "string", description: "Numéro de téléphone fonctionnel" },
+                    niveau_etude: { type: "string", description: "Primaire / Collège / Lycée / Université / Professionnel" },
+                    interet: { type: "string", description: "Ce qui l'intéresse chez BloLab" },
+                    programme_choisi: { type: "string", description: "ClassTech / Ecole229 / KMC / Incubateur / FabLab" },
+                    motivation: { type: "string", description: "Pourquoi veut-il s'inscrire" },
+                    comment_connu: { type: "string", description: "Comment a-t-il entendu parler de BloLab" },
+                    financeur_nom: { type: "string", description: "Nom de la personne qui finance la formation" },
+                    financeur_email: { type: "string", description: "Email du financeur" },
+                    financeur_telephone: { type: "string", description: "Téléphone du financeur" },
+                    notes_agent: { type: "string", description: "Résumé de la conversation et observations de l'agent" }
+                },
+                required: ["prenom", "programme_choisi"]
+            }
+        }
     }
 ];
 
@@ -123,6 +143,25 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
     if (name === 'send_telegram_alert') {
         await sendTelegramAlert(args.message)
         return { result: 'Alerte envoyée.' }
+    }
+
+    if (name === 'register_inscription') {
+        // Appel de l'API inscription/create
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'http://localhost:3001'
+        try {
+            const res = await fetch(`${appUrl}/api/inscription/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...args, chat_id: from }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                return { error: data.error || 'Erreur lors de l\'inscription' }
+            }
+            return { result: `Inscription enregistrée avec succès. ID: ${data.inscriptionId}. Message: ${data.message}` }
+        } catch (err: any) {
+            return { error: `Erreur réseau: ${err.message}` }
+        }
     }
 
     return { error: 'Unknown tool' }

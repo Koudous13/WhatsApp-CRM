@@ -26,27 +26,101 @@ type Prospect = {
     notes_auto: string | null
 }
 
-const PROGRAMMES = ['Tous', 'ClassTech', 'Ecole229', 'KMC', 'Incubateur', 'FabLab']
-const STATUTS = ['Tous', 'Nouveau', 'Qualifie', 'Proposition faite', 'Interesse', 'Inscription', 'Froid']
+const PROGRAMMES = ['ClassTech', 'Ecole229', 'KMC', 'Incubateur', 'FabLab']
+const STATUTS = ['Nouveau', 'Qualifie', 'Proposition faite', 'Interesse', 'Inscription', 'Froid']
+
+type SmartSegment = {
+    id: string
+    name: string
+    filters: {
+        programmes: string[]
+        statuts: string[]
+        scoreMin: number
+        scoreMax: number
+    }
+}
 
 export default function ContactsPage() {
     const supabase = createClient()
     const [prospects, setProspects] = useState<Prospect[]>([])
     const [selected, setSelected] = useState<Prospect | null>(null)
     const [search, setSearch] = useState('')
-    const [filterProgramme, setFilterProgramme] = useState('Tous')
-    const [filterStatut, setFilterStatut] = useState('Tous')
+    const [filterProgrammes, setFilterProgrammes] = useState<string[]>([])
+    const [filterStatuts, setFilterStatuts] = useState<string[]>([])
+    const [filterScoreMin, setFilterScoreMin] = useState(0)
+    const [filterScoreMax, setFilterScoreMax] = useState(100)
+    const [showAdvanced, setShowAdvanced] = useState(false)
     const [loading, setLoading] = useState(true)
     const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban')
     const [draggingId, setDraggingId] = useState<number | null>(null)
     const [updatingId, setUpdatingId] = useState<number | null>(null)
+    const [isLocked, setIsLocked] = useState(true)
+    const [segments, setSegments] = useState<SmartSegment[]>([])
+    const [savingSegment, setSavingSegment] = useState(false)
+    const [segmentName, setSegmentName] = useState('')
+    const [showSaveSegment, setShowSaveSegment] = useState(false)
 
     // Colonnes du Kanban
     const KANBAN_COLUMNS = ['Nouveau', 'Qualifie', 'Interesse', 'Proposition faite', 'Inscription', 'Froid']
 
     useEffect(() => {
         load()
+        loadSegments()
     }, [])
+
+    async function loadSegments() {
+        const { data } = await supabase.from('Smart_Segments').select('*').order('created_at', { ascending: false })
+        setSegments((data as any) ?? [])
+    }
+
+    function toggleProgramme(p: string) {
+        setFilterProgrammes(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])
+    }
+
+    function toggleStatut(s: string) {
+        setFilterStatuts(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+    }
+
+    function resetFilters() {
+        setFilterProgrammes([])
+        setFilterStatuts([])
+        setFilterScoreMin(0)
+        setFilterScoreMax(100)
+        setSearch('')
+    }
+
+    function applySegment(seg: SmartSegment) {
+        setFilterProgrammes(seg.filters.programmes)
+        setFilterStatuts(seg.filters.statuts)
+        setFilterScoreMin(seg.filters.scoreMin)
+        setFilterScoreMax(seg.filters.scoreMax)
+    }
+
+    async function saveSegment() {
+        if (!segmentName.trim()) return
+        setSavingSegment(true)
+        const filters = { programmes: filterProgrammes, statuts: filterStatuts, scoreMin: filterScoreMin, scoreMax: filterScoreMax }
+        try {
+            const { error } = await supabase.from('Smart_Segments').upsert({ name: segmentName.trim(), filters }, { onConflict: 'name' })
+            if (error) {
+                alert(`Erreur sauvegarde: ${error.message}\n\nVérifiez que la table Smart_Segments existe dans Supabase.`)
+                console.error('saveSegment error:', error)
+            } else {
+                setSegmentName('')
+                setShowSaveSegment(false)
+                loadSegments()
+            }
+        } catch (e: any) {
+            alert(`Erreur inattendue: ${e.message}`)
+        } finally {
+            setSavingSegment(false)
+        }
+    }
+
+    async function deleteSegment(id: string) {
+        await supabase.from('Smart_Segments').delete().eq('id', id)
+        loadSegments()
+    }
 
     async function load() {
         setLoading(true)
@@ -60,15 +134,20 @@ export default function ContactsPage() {
     }
 
     const filtered = prospects.filter(p => {
-        const name = `${p.prenom ?? ''} ${p.nom ?? ''} ${p.chat_id} ${p.ville ?? ''}`.toLowerCase()
-        const matchSearch = name.includes(search.toLowerCase())
-        const matchProg = filterProgramme === 'Tous' || p.programme_recommande === filterProgramme
-        const matchStatut = filterStatut === 'Tous' || p.statut_conversation === filterStatut
-        return matchSearch && matchProg && matchStatut
+        const nameStr = `${p.prenom ?? ''} ${p.nom ?? ''} ${p.chat_id} ${p.ville ?? ''}`.toLowerCase()
+        const matchSearch = nameStr.includes(search.toLowerCase())
+        const matchProg = filterProgrammes.length === 0 || filterProgrammes.includes(p.programme_recommande ?? '')
+        const matchStatut = filterStatuts.length === 0 || filterStatuts.includes(p.statut_conversation)
+        const matchScore = p.score_engagement >= filterScoreMin && p.score_engagement <= filterScoreMax
+        return matchSearch && matchProg && matchStatut && matchScore
     })
 
     // Handler Drag & Drop
     const handleDragStart = (e: React.DragEvent, id: number) => {
+        if (isLocked) {
+           e.preventDefault()
+           return
+        }
         setDraggingId(id)
         e.dataTransfer.setData('text/plain', id.toString())
         e.dataTransfer.effectAllowed = 'move'
@@ -130,24 +209,161 @@ export default function ContactsPage() {
                             </h1>
                             <p className="text-sm text-slate-400">{prospects.length} prospects</p>
                         </div>
+                        <div className="flex items-center gap-3">
+                            {viewMode === 'kanban' && (
+                                <button 
+                                    onClick={() => setIsLocked(!isLocked)}
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border",
+                                        isLocked 
+                                            ? "bg-slate-800 text-slate-400 border-slate-700 hover:text-white" 
+                                            : "bg-amber-500/10 text-amber-500 border-amber-500/40 animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                                    )}
+                                >
+                                    {isLocked ? '🔒 INTERFACE VERROUILLÉE' : '🔓 ÉDITION ACTIVÉE'}
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="flex flex-col gap-4">
-                        <div className="flex gap-3 flex-wrap items-center">
+                    <div className="flex flex-col gap-3">
+                        {/* Ligne 1: Recherche + bouton filtres avancés */}
+                        <div className="flex gap-3 items-center">
                             <input
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 placeholder="Rechercher un contact..."
-                                className="flex-1 min-w-48 px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="flex-1 px-3 py-2 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
                             />
-                            <div className="flex bg-slate-800/30 rounded-lg p-1 flex-wrap gap-1" style={{ border: '1px solid rgba(30, 58, 95, 0.6)' }}>
-                                <button onClick={() => { setFilterStatut('Tous'); setFilterProgramme('Tous') }} className={cn("px-4 py-1.5 rounded-md text-xs font-semibold transition-all", filterStatut === 'Tous' && filterProgramme === 'Tous' ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-white hover:bg-slate-700/50")}>Tous</button>
-                                <button onClick={() => { setFilterStatut('Qualifie'); setFilterProgramme('Tous') }} className={cn("px-4 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-2", filterStatut === 'Qualifie' ? "bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30" : "text-slate-400 hover:text-white hover:bg-slate-700/50")}>🔥 Hot Leads</button>
-                                <button onClick={() => { setFilterStatut('Tous'); setFilterProgramme('ClassTech') }} className={cn("px-4 py-1.5 rounded-md text-xs font-semibold transition-all", filterProgramme === 'ClassTech' ? "bg-blue-500/20 text-blue-400 shadow-sm border border-blue-500/30" : "text-slate-400 hover:text-white hover:bg-slate-700/50")}>📚 ClassTech</button>
-                                <button onClick={() => { setFilterStatut('Froid'); setFilterProgramme('Tous') }} className={cn("px-4 py-1.5 rounded-md text-xs font-semibold transition-all", filterStatut === 'Froid' ? "bg-slate-800 text-slate-300 shadow-sm border border-slate-600/50" : "text-slate-400 hover:text-white hover:bg-slate-700/50")}>❄️ Froids</button>
-                            </div>
+                            <button
+                                onClick={() => setShowAdvanced(!showAdvanced)}
+                                className={cn(
+                                    "px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border",
+                                    showAdvanced ? "bg-blue-600/20 text-blue-400 border-blue-500/40" : "bg-slate-800/50 text-slate-400 border-slate-700/50 hover:text-white"
+                                )}
+                            >
+                                🎛️ Filtres {(filterProgrammes.length + filterStatuts.length > 0 || filterScoreMin > 0 || filterScoreMax < 100) && <span className="bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">{filterProgrammes.length + filterStatuts.length + (filterScoreMin > 0 || filterScoreMax < 100 ? 1 : 0)}</span>}
+                            </button>
+                            {(filterProgrammes.length + filterStatuts.length > 0 || filterScoreMin > 0 || filterScoreMax < 100) && (
+                                <button onClick={resetFilters} className="px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-red-400 transition-colors">✕ Reset</button>
+                            )}
                         </div>
+
+                        {/* Segments Sauvegardés */}
+                        {segments.length > 0 && (
+                            <div className="flex gap-2 flex-wrap">
+                                <span className="text-xs text-slate-500 self-center">💾 Segments:</span>
+                                {segments.map(seg => (
+                                    <div key={seg.id} className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => applySegment(seg)}
+                                            className="px-3 py-1 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-full text-xs hover:bg-indigo-500/30 transition-colors"
+                                        >
+                                            {seg.name}
+                                        </button>
+                                        <button onClick={() => deleteSegment(seg.id)} className="text-slate-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Panneau Filtres Avancés */}
+                        {showAdvanced && (
+                            <div className="glass-card p-4 space-y-4 animate-fadeIn">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Programmes */}
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">🎓 Programmes</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {PROGRAMMES.map(prog => (
+                                                <button
+                                                    key={prog}
+                                                    onClick={() => toggleProgramme(prog)}
+                                                    className={cn(
+                                                        "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
+                                                        filterProgrammes.includes(prog)
+                                                            ? "bg-blue-500/30 text-blue-300 border-blue-500/50 shadow-sm"
+                                                            : "bg-slate-800/50 text-slate-400 border-slate-700/50 hover:text-white hover:border-slate-500"
+                                                    )}
+                                                >
+                                                    {prog}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {/* Statuts */}
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">📊 Statuts</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {STATUTS.map(statut => (
+                                                <button
+                                                    key={statut}
+                                                    onClick={() => toggleStatut(statut)}
+                                                    className={cn(
+                                                        "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
+                                                        filterStatuts.includes(statut)
+                                                            ? "bg-emerald-500/30 text-emerald-300 border-emerald-500/50 shadow-sm"
+                                                            : "bg-slate-800/50 text-slate-400 border-slate-700/50 hover:text-white hover:border-slate-500"
+                                                    )}
+                                                >
+                                                    {statut}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Plage de score */}
+                                <div>
+                                    <p className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">🎯 Score d&apos;engagement : <span className="text-white">{filterScoreMin} — {filterScoreMax}</span></p>
+                                    <div className="flex gap-4 items-center">
+                                        <div className="flex-1">
+                                            <p className="text-[10px] text-slate-500 mb-1">Min</p>
+                                            <input type="range" min={0} max={100} value={filterScoreMin}
+                                                onChange={e => setFilterScoreMin(Math.min(Number(e.target.value), filterScoreMax - 1))}
+                                                className="w-full accent-blue-500"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-[10px] text-slate-500 mb-1">Max</p>
+                                            <input type="range" min={0} max={100} value={filterScoreMax}
+                                                onChange={e => setFilterScoreMax(Math.max(Number(e.target.value), filterScoreMin + 1))}
+                                                className="w-full accent-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Sauvegard du segment */}
+                                <div className="flex items-center justify-between border-t border-slate-700/50 pt-3">
+                                    <p className="text-xs text-slate-400">{filtered.length} résultats avec ces filtres</p>
+                                    <div className="flex gap-2 items-center">
+                                        {showSaveSegment ? (
+                                            <>
+                                                <input
+                                                    value={segmentName}
+                                                    onChange={e => setSegmentName(e.target.value)}
+                                                    placeholder="Nom du segment..."
+                                                    onKeyDown={e => e.key === 'Enter' && saveSegment()}
+                                                    className="px-3 py-1.5 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                    style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(30, 58, 95, 0.8)' }}
+                                                    autoFocus
+                                                />
+                                                <button onClick={saveSegment} disabled={savingSegment} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                                                    {savingSegment ? '...' : '💾 Sauvegarder'}
+                                                </button>
+                                                <button onClick={() => setShowSaveSegment(false)} className="text-slate-400 hover:text-white text-xs">✕</button>
+                                            </>
+                                        ) : (
+                                            <button onClick={() => setShowSaveSegment(true)} className="px-3 py-1.5 bg-slate-700 text-slate-300 text-xs rounded-lg hover:bg-slate-600 transition-colors">
+                                                💾 Enregistrer ce segment
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -180,11 +396,12 @@ export default function ContactsPage() {
                                                 return (
                                                     <div
                                                         key={p.id}
-                                                        draggable
+                                                        draggable={!isLocked}
                                                         onDragStart={(e) => handleDragStart(e, p.id)}
                                                         onClick={() => setSelected(p)}
                                                         className={cn(
-                                                            "glass-card p-4 rounded-lg cursor-grab active:cursor-grabbing border border-slate-700/50 hover:border-blue-500/50 transition-all",
+                                                            "glass-card p-4 rounded-lg border border-slate-700/50 hover:border-blue-500/50 transition-all",
+                                                            isLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing",
                                                             draggingId === p.id ? "opacity-40 border-dashed" : "opacity-100",
                                                             updatingId === p.id ? "animate-pulse" : ""
                                                         )}
