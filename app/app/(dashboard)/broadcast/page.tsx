@@ -143,9 +143,10 @@ export default function BroadcastPage() {
             header: true,
             skipEmptyLines: true,
             complete: (results) => {
-                setCsvData(results.data)
-                if (results.data.length > 0) setCsvHeaders(Object.keys(results.data[0]))
-                setEstimate(results.data.length)
+                const parsedData = results.data as Record<string, unknown>[]
+                setCsvData(parsedData)
+                if (parsedData.length > 0) setCsvHeaders(Object.keys(parsedData[0]))
+                setEstimate(parsedData.length)
             }
         })
     }
