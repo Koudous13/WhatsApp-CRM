@@ -208,9 +208,9 @@ async function sendAdvancedBroadcast(
             })
         }
 
-        // Rate limiting anti-ban - RÉDUIT À 0.5s pour forcer les 10 contacts dans les 10s
+        // Rate limiting anti-ban - AUGMENTÉ À 5.5s pour tester le timeout Vercel (Hobby = 10s)
         if (i < audience.length - 1) {
-            await new Promise(r => setTimeout(r, 500))
+            await new Promise(r => setTimeout(r, 5500))
         }
     }
 
