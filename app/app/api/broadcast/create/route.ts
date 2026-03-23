@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         const sf: SegmentFilters = segmentFilters
         let query = supabase
             .from('Profil_Prospects')
-            .select('chat_id, prenom, nom, programme_recommande, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
+            .select('chat_id, prenom, nom, programme_recommande, programme_souhaite, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
         
         if (filterOptIn !== false) query = query.eq('opt_in', true) // Protection anti-spam par défaut
         if (sf.programmes && sf.programmes.length > 0) query = query.in('programme_recommande', sf.programmes)
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
             metadata: {
                 Prenom: r.prenom || '',
                 Nom: r.nom || '',
-                Programme: r.programme_recommande || '',
+                Programme: r.programme_recommande || r.programme_souhaite || '',
                 Statut: r.statut_conversation || '',
                 Ville: r.ville || '',
                 Objectif: r.objectif || '',
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
         // Audience via filtre programme simple (mode classique ou multi-choix)
         let query = supabase
             .from('Profil_Prospects')
-            .select('chat_id, prenom, nom, programme_recommande, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
+            .select('chat_id, prenom, nom, programme_recommande, programme_souhaite, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
         
         if (filterOptIn !== false) query = query.eq('opt_in', true)
 
