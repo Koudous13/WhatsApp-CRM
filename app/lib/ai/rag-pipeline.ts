@@ -147,7 +147,7 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
 
     if (name === 'register_inscription') {
         // Appel de l'API inscription/create
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'http://localhost:3001'
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://whatsapp-crm-blolabparakou.vercel.app'
         try {
             const res = await fetch(`${appUrl}/api/inscription/create`, {
                 method: 'POST',
