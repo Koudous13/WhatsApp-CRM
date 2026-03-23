@@ -1,1 +1,13 @@
+/node_modules
+/.next
+/.vercel
+.env*
+*.log
 /proposition_front_end
+/app/node_modules
+/app/.next
+/app/.env*
+/TECH_SPEC
+*.mp3
+*.png
+*.json
