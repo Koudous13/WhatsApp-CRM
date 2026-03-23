@@ -108,6 +108,13 @@ export async function POST(req: NextRequest) {
         }
 
         console.log(`[Broadcast] Lancement de la campagne "${name}" pour ${audience.length} destinataires.`);
+        
+        // LOG DIAGNOSTIC
+        await supabase.from('ai_logs').insert({
+            contact_chat_id: 'SYSTEM_BROADCAST',
+            user_message: `DÉBUT CAMPAGNE: ${name}`,
+            system_prompt: JSON.stringify({ audience_count: audience.length, variants_count: variants.length })
+        })
 
         const { data: campaign, error } = await supabase
             .from('broadcasts')
@@ -182,18 +189,32 @@ async function sendAdvancedBroadcast(
             console.log(`[Broadcast ${campaignId}] Envoi à ${person.chat_id} (${i + 1}/${audience.length})`);
             await sendWhatsAppMessage(String(person.chat_id), personalizedBody)
             sent++
+            
+            // LOG RÉUSSITE PAR DÉFAUT (debug)
+            await supabase.from('ai_logs').insert({
+                contact_chat_id: person.chat_id,
+                user_message: `BROADCAST OK: ${i + 1}/${audience.length}`,
+                system_prompt: `Campagne: ${campaignId}`
+            })
         } catch (err: any) {
             console.error(`[Broadcast ${campaignId}] Échec pour ${person.chat_id}:`, err);
             failed++
+            
+            // LOG ÉCHEC
+            await supabase.from('ai_logs').insert({
+                contact_chat_id: person.chat_id,
+                user_message: `BROADCAST ÉCHEC: ${String(err).substring(0, 100)}`,
+                system_prompt: `Campagne: ${campaignId}`
+            })
         }
 
-        // Rate limiting anti-ban - RÉDUIT À 1s pour rester sous le timeout Vercel (10s)
+        // Rate limiting anti-ban - RÉDUIT À 0.5s pour forcer les 10 contacts dans les 10s
         if (i < audience.length - 1) {
-            await new Promise(r => setTimeout(r, 1000))
+            await new Promise(r => setTimeout(r, 500))
         }
     }
 
-    // Mise à jour finale UNIQUE pour économiser du temps d'exécution
+    // Mise à jour finale UNIQUE
     await supabase.from('broadcasts')
         .update({ 
             status: 'completed',
@@ -203,4 +224,11 @@ async function sendAdvancedBroadcast(
             sent_at: new Date().toISOString(),
         })
         .eq('id', campaignId)
+
+    // LOG FIN
+    await supabase.from('ai_logs').insert({
+        contact_chat_id: 'SYSTEM_BROADCAST',
+        user_message: `FIN CAMPAGNE: ${campaignId}`,
+        system_prompt: `Total: ${sent}/${audience.length} envoyés.`
+    })
 }
