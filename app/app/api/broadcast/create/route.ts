@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
             const sf: SegmentFilters = segmentFilters
             let query = supabase
                 .from('Profil_Prospects')
-                .select('chat_id, prenom, nom, programme_recommande, programme_souhaite, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
+                .select('chat_id, prenom, nom, programme_recommande, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
             
             if (filterOptIn !== false) query = query.eq('opt_in', true)
             if (sf.programmes && sf.programmes.length > 0) query = query.in('programme_recommande', sf.programmes)
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
                 metadata: {
                     Prenom: r.prenom || '',
                     Nom: r.nom || '',
-                    Programme: r.programme_recommande || r.programme_souhaite || '',
+                    Programme: r.programme_recommande || '',
                     Statut: r.statut_conversation || '',
                     Ville: r.ville || '',
                     Objectif: r.objectif || '',
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         } else {
             let query = supabase
                 .from('Profil_Prospects')
-                .select('chat_id, prenom, nom, programme_recommande, programme_souhaite, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
+                .select('chat_id, prenom, nom, programme_recommande, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
             
             if (filterOptIn !== false) query = query.eq('opt_in', true)
             if (Array.isArray(filterProgramme) && filterProgramme.length > 0) {
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
                 metadata: {
                     Prenom: r.prenom || '',
                     Nom: r.nom || '',
-                    Programme: r.programme_recommande || r.programme_souhaite || '',
+                    Programme: r.programme_recommande || '',
                     Statut: r.statut_conversation || '',
                     Ville: r.ville || '',
                     Objectif: r.objectif || '',
