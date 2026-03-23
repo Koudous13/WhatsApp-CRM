@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
         if (csvData && csvData.length > 0) {
             audience = csvData.map((row: any) => ({
-                chat_id: row.phone || row.Phone || row.whatsapp || row.chat_id,
+                chat_id: row.phone || row.Phone || row.whatsapp || row.chat_id || row.telephone || row.Telephone || row.numero || row.Numero || row.Numéro,
                 metadata: row
             })).filter((a: any) => a.chat_id)
         } else if (selectedSegmentId && segmentFilters) {
