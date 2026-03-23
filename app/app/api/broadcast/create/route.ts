@@ -157,11 +157,10 @@ async function sendAdvancedBroadcast(
     for (let i = 0; i < audience.length; i++) {
         const person = audience[i]
         
-        // Choix de la variante selon le ratio (N-Split)
+        // Choix de la variante
         const random = Math.random() * 100
         let cumulative = 0
         let selectedVariant = variants[0]
-        
         for (const v of variants) {
             cumulative += v.ratio
             if (random <= cumulative) {
@@ -170,14 +169,12 @@ async function sendAdvancedBroadcast(
             }
         }
 
-        // Remplacement sécurisé des tags dynamiques {Tag}
+        // Remplacement sécurisé des tags
         let personalizedBody = selectedVariant.body
         if (person.metadata) {
             Object.entries(person.metadata).forEach(([key, val]) => {
-                // Échapper les caractères spéciaux de la clé pour la Regex
                 const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                const regex = new RegExp(`\\{${escapedKey}\\}`, 'gi')
-                personalizedBody = personalizedBody.replace(regex, String(val || ''))
+                personalizedBody = personalizedBody.replace(new RegExp(`\\{${escapedKey}\\}`, 'gi'), String(val || ''))
             })
         }
 
@@ -185,35 +182,24 @@ async function sendAdvancedBroadcast(
             console.log(`[Broadcast ${campaignId}] Envoi à ${person.chat_id} (${i + 1}/${audience.length})`);
             await sendWhatsAppMessage(String(person.chat_id), personalizedBody)
             sent++
-        } catch (err) {
+        } catch (err: any) {
             console.error(`[Broadcast ${campaignId}] Échec pour ${person.chat_id}:`, err);
             failed++
         }
 
-        // Mise à jour progressive du compteur dans la DB toutes les 10 personnes ou à la fin
-        if (sent % 10 === 0 || i === audience.length - 1) {
-            await supabase.from('broadcasts')
-                .update({ 
-                    sent_count: sent, 
-                    failed_count: failed,
-                    delivered_count: sent 
-                })
-                .eq('id', campaignId)
-        }
-
-        // Rate limiting anti-ban (2s par message)
+        // Rate limiting anti-ban - RÉDUIT À 1s pour rester sous le timeout Vercel (10s)
         if (i < audience.length - 1) {
-            await new Promise(r => setTimeout(r, 2000))
+            await new Promise(r => setTimeout(r, 1000))
         }
     }
 
-    // Update final stats
+    // Mise à jour finale UNIQUE pour économiser du temps d'exécution
     await supabase.from('broadcasts')
-        .update({
+        .update({ 
             status: 'completed',
-            sent_count: sent,
-            delivered_count: sent, // approximation — à affiner avec les webhooks de livraison
+            sent_count: sent, 
             failed_count: failed,
+            delivered_count: sent,
             sent_at: new Date().toISOString(),
         })
         .eq('id', campaignId)
