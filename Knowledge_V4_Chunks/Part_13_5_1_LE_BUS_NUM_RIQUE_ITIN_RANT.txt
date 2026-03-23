@@ -1,0 +1,40 @@
+DOCUMENT : 5.1 LE BUS NUMÉRIQUE ITINÉRANT (BLOBUS)
+==================================================
+
+5.1 LE BUS NUMÉRIQUE ITINÉRANT (BLOBUS)
+
+📌 Fiche Technique (BloBus)
+- Nom du Programme : BloBus (Bus Numérique Itinérant Tiers-lieu).
+- Cible / Pour qui c'est fait ? : Populations rurales, élèves et citoyens éloignés des centres urbains du Bénin.
+- La promesse / L'objectif principal : Lutter contre la fracture numérique en amenant internet et le matériel informatique directement dans les villages.
+- Villes / Lieux disponibles : Projet itinérant, parcourt de nombreuses communes du Bénin (plus de 15 villes desservies).
+- Durée de la formation : Interventions ponctuelles selon le calendrier des tournées.
+- Coût de la formation : 100% Gratuit pour toutes les populations locales ciblées.
+- Modalités de paiement : Aucun frais (financé par les partenaires de BloLab).
+- Les compétences clés acquises : Éveil digital général, découverte d'Internet, maniement de la souris et apprentissage du clavier.
+- Les "Plus" ou Bonus : Le bus est 100% autonome grâce à ses panneaux solaires (4,1 Kw), il est équipé d'ordinateurs et de la climatisation.
+- Prérequis : Se trouver sur l'itinéraire du bus lors de son passage.
+- Horaires : Variables, tout au long de la journée lors des arrêts en commune.
+- Date de passage : Tournées régulières tout au long de l'année.
+
+💬 Questions et Réponses (BloBus)
+1. Q : C'est quoi le BloBus ?  
+   R : C'est le premier bus numérique itinérant du Bénin. C'est un labo mobile gratuit qui apprend l'informatique aux jeunes en zone rurale.
+2. Q : Où est-ce que le bus se déplace ?  
+   R : Il parcourt tout le pays et a déjà été déployé dans une quinzaine de villes et villages aux quatre coins du Bénin.
+3. Q : Combien ça coûte de monter à bord ?  
+   R : L'accès au BloBus et aux formateurs est entièrement gratuit pour les populations locales.
+4. Q : Est-ce qu'il fait chaud à l'intérieur ?  
+   R : Non, le bus est équipé d'un système de climatisation pour accueillir les visiteurs dans de bonnes conditions.
+5. Q : Comment fonctionne l'électricité dans le bus ?  
+   R : Le toit du bus est couvert de panneaux solaires qui produisent 4,1 Kw d'énergie, ce qui rend les équipements 100% autonomes.
+6. Q : Est-ce qu'il y a internet dans le bus ?  
+   R : Oui, on amène aussi une connexion internet haut débit gratuite pour que les ruraux puissent surfer en cabine.
+7. Q : C'est quoi la "fracture numérique" ?  
+   R : C'est le fossé technologique entre ceux qui ont accès au haut débit (comme à Cotonou) et ceux qui en sont privés dans les zones rurales.
+8. Q : Le bus circule-t-il toute l'année ?  
+   R : Oui, il suit son itinéraire tout au long de l'année selon le calendrier validé par les superviseurs.
+9. Q : Pourquoi le bus est-il peint en jaune ?  
+   R : La couleur jaune rappelle les bus scolaires, c'est rassurant et ça invite les enfants à venir découvrir la technologie sans crainte.
+10. Q : Comment peut-on vous contacter ?  
+    R : Vous pouvez nous joindre par téléphone ou sur WhatsApp au numéro suivant : (+229) 01 62 19 35 35.

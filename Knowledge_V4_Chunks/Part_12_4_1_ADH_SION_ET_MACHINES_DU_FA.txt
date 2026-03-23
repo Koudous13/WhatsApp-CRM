@@ -1,0 +1,40 @@
+DOCUMENT : 4.1 ADHÉSION ET MACHINES DU FABLAB
+==================================================
+
+4.1 ADHÉSION ET MACHINES DU FABLAB
+
+📌 Fiche Technique (Adhésion FabLab)
+- Nom du Programme : Espace FabLab & Réservation de Machines
+- Cible / Pour qui c'est fait ? : Tout public (particuliers, indépendants, étudiants, entreprises, artisans).
+- La promesse / L'objectif principal : Donner accès à des machines de pointe (imprimantes 3D, laser, CNC) pour fabriquer ses propres objets ou prototypes à bas coût.
+- Villes / Lieux disponibles : Cotonou et Parakou.
+- Durée de l'adhésion : Valable 1 an (12 mois).
+- Coût annuel : Tarif Normal (60 000 FCFA), Étudiant (42 000 FCFA), Entreprise (80 000 FCFA).
+- Modalités de paiement : Règlement intégral lors de l'inscription.
+- Machines disponibles : Imprimantes 3D, fraiseuses CNC, graveuses et découpeuses Laser, brodeuses numériques.
+- Les "Plus" ou Bonus : Accès gratuit à l'espace coworking et au Wi-Fi haut débit par fibre optique.
+- Prérequis : Devenir membre et être à jour de sa cotisation annuelle.
+- Horaires : Lundi au vendredi (8h - 18h) et samedi (9h - 13h).
+- Date de rentrée : Inscription libre à tout moment de l'année.
+
+💬 Questions et Réponses (FabLab Adhésion)
+1. Q : C'est quoi un FabLab ?  
+   R : C'est un laboratoire de fabrication numérique ouvert au public, avec des machines pilotées par ordinateur pour créer n'importe quel objet.
+2. Q : Quelles sont les machines disponibles ?  
+   R : On a des imprimantes 3D, des fraiseuses CNC industrielles, des graveuses Laser CO2 et des brodeuses numériques.
+3. Q : Y a-t-il un tarif étudiant ?  
+   R : Oui, les étudiants bénéficient d'une réduction, l'adhésion annuelle est fixée à 42 000 FCFA.
+4. Q : Combien paye un particulier ?  
+   R : Le tarif normal pour une personne est de 60 000 FCFA pour l'année complète.
+5. Q : Et pour une entreprise ?  
+   R : Les PME peuvent adhérer pour un tarif annuel de 80 000 FCFA.
+6. Q : Est-ce que j'ai accès à internet sur place ?  
+   R : Oui, tous nos membres ont accès gratuitement à la fibre optique très haut débit du laboratoire.
+7. Q : À quelle heure ferme le FabLab ?  
+   R : Le laboratoire ferme ses portes à 18h en semaine.
+8. Q : On peut s'inscrire n'importe quand ?  
+   R : Oui, vous pouvez venir prendre votre abonnement à n'importe quel moment de l'année.
+9. Q : faut-il être membre pour utiliser une machine ?  
+   R : Si vous ne voulez pas d'abonnement annuel, vous pouvez aussi louer les machines à l'heure.
+10. Q : Est-ce que vous pouvez fabriquer l'objet pour moi ?  
+    R : Oui, nos ingénieurs peuvent concevoir et fabriquer vos objets sur commande (sur devis).

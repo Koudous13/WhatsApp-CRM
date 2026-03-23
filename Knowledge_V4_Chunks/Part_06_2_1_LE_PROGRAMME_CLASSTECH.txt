@@ -1,0 +1,40 @@
+DOCUMENT : 2.1 LE PROGRAMME CLASSTECH
+==================================================
+
+2.1 LE PROGRAMME CLASSTECH
+
+📌 Fiche Technique (ClassTech)
+- Nom du Programme : ClassTech (L'Atelier des Petits Codeurs)
+- Cible / Pour qui c'est fait ? : Enfants et adolescents de 7 à 17 ans curieux de découvrir la technologie et la création de solutions.
+- La promesse / L'objectif principal : Initier l'enfant au code et à la robotique pour l'aider à transformer ses heures d'écrans en véritables heures de création.
+- Villes / Lieux disponibles : Cotonou ET Parakou (en simultané)
+- Durée de la formation : Longue durée étalée sur toute l'année (de Janvier à Décembre).
+- Coût de la formation : 90.000 FCFA pour l'année entière.
+- Modalités de paiement : Règlement final exigé au démarrage à l'inscription.
+- Les compétences clés acquises : Initiation à la programmation (Scratch, Python), montage d'ordinateurs avec du plastique recyclé (Jerry), petite robotique et impression 3D.
+- Les "Plus" ou Bonus : Développement des "soft skills" (prise de parole, esprit d'équipe). Tout le matériel technologique labo est fourni aux enfants de façon ultra-sécurisée.
+- Prérequis : L'enfant doit impérativement avoir entre 7 et 17 ans. 
+- Horaires précis : Un atelier parascolaire : le Mercredi (15h-17h) OU le Samedi (10h-12h). Le programme est mis en pause pendant les congés scolaires.
+- Date de la prochaine rentrée : Entrées "glissantes", on peut inscrire son enfant à n'importe quel moment de l'année dès validation de l'inscription financière.
+
+💬 Questions et Réponses (ClassTech)
+1. Q : De quoi s'agit-il lorsque vous évoquez le programme "ClassTech" ?  
+   R : ClassTech (L'Atelier des Petits Codeurs) est un programme extrascolaire annuel qui initie les jeunes enfants à la robotique et au code de manière très pédagogique.
+2. Q : Quelle est la tranche d'âge acceptée dans ClassTech ?  
+   R : Le programme accepte tous les enfants et adolescents (garçons et filles) âgés de 7 ans jusqu'à un âge maximum de 17 ans.
+3. Q : Quel est le tarif pour l'année entière de cours d'atelier ClassTech ?  
+   R : Les frais sont fixés à un tarif social très abordable de 90.000 FCFA pour l'ensemble de l'année de cours.
+4. Q : À quels horaires se déroulent les séances pour ne pas empiéter sur l'école ?  
+   R : Nous proposons des classes purement sur du temps libre extrascolaire : votre enfant y assiste soit le mercredi de 15h à 17h, soit le samedi entre 10h et 12h.
+5. Q : Est-ce dangereux pour un enfant de venir manipuler ces machines impressionnantes ?  
+   R : Absolument pas. Tout le matériel utilisé est adapté à leur âge et strictement encadré par des formateurs pédagogues bienveillants.
+6. Q : Le ClassTech continue-t-il pendant les grandes vacances scolaires estivales ?  
+   R : Non. Pendant les périodes formelles de vacances prolongées, nous passons à notre format de stages courts "KidsMakersChallenge" et "Futur Makers".
+7. Q : Les petits habitants de Parakou ont-ils droit à ces ateliers d'éveil ?  
+   R : Oui tout à fait ; l'Atelier ClassTech se programme avec le même contenu simultanément au nord (Parakou) et au Sud (Cotonou).
+8. Q : Mon enfant va-t-il uniquement apprendre du langage codé Python ?  
+   R : Non. Ils ne resteront pas seulement derrière des écrans ; ils fabriquent notamment des automates robotiques, font de petites soudures amusantes et impriment en 3D.
+9. Q : Que signifie la construction de l'ordinateur "Jerry" ?  
+   R : C'est notre exercice ludique phare sur le développement durable : l'enfant bâtit le cœur d'un ordinateur très performant en utilisant la carcasse d'un vieux bidon coupé et recyclé !
+10. Q : Doit-on attendre la rentrée d'octobre pour y inscrire mon enfant ?  
+    R : Non, inscrire votre enfant au ClassTech est possible à tout instant de l'année puisque les groupes sont constamment animés.

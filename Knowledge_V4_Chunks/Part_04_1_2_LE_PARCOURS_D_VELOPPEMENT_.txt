@@ -1,0 +1,40 @@
+DOCUMENT : 1.2 LE PARCOURS DÉVELOPPEMENT WEB (DW)
+==================================================
+
+1.2 LE PARCOURS DÉVELOPPEMENT WEB (DW)
+
+📌 Fiche Technique (DW)
+- Nom du Programme : Développement Web (DW)
+- Cible / Pour qui c'est fait ? : Personnes souhaitant se spécialiser dans les portails d'entreprise et les bases de données web.
+- La promesse / L'objectif principal : Devenir développeur web certifié, maîtrisant le développement web de bout en bout (front-end et back-end).
+- Villes / Lieux disponibles : Cotonou ET Parakou
+- Durée de la formation : 9 mois
+- Coût de la formation : 500.000 FCFA (Cotonou) / 350.000 FCFA (Parakou)
+- Modalités de paiement : Payables sur 2 tranches maximum (dont 50% d'avance pour démarrer).
+- Les compétences clés acquises : HTML, CSS, JavaScript, PHP, MySQL, MongoDB, Vue.js et Laravel.
+- Les "Plus" ou Bonus : Stage continu en entreprise inclus et pratique sur des projets intensifs de groupe.
+- Prérequis : Minimum 18 ans, ordinateur portatif obligatoire, aucune base technique préalable requise.
+- Horaires précis : Présentiel total, demande une disponibilité totale à temps plein.
+- Date de la prochaine rentrée : Rentrées en continu (Dernière clôture de candidature mentionnée : 28 Février 2026).
+
+💬 Questions et Réponses (DW)
+1. Q : Quelle est la grande différence entre DW et DWM ?  
+   R : Le parcours DW (9 mois) se concentre purement sur la création de plateformes internet, sans aborder le développement d'applications mobiles.
+2. Q : Y a-t-il un stage d'application pour le cursus Développement Web ?  
+   R : Oui, la formation intègre obligatoirement un stage pratique en entreprise avant l'obtention de votre certificat final.
+3. Q : À combien s'élèvent les frais de scolarité pour le DW à Cotonou ?  
+   R : Sur notre campus de Cotonou, le prix est fixé à un total de 500.000 FCFA pour l'ensemble des 9 mois.
+4. Q : Quel est le tarif pratiqué sur le campus de Parakou pour DW ?  
+   R : À Parakou, ce même parcours intensif vous coûtera 350.000 FCFA.
+5. Q : Que faut-il verser pour avoir le droit de débuter en classe ?  
+   R : Pour démarrer vos cours, il vous suffit de régler une première avance correspondant à la moitié (50%) du coût officiel de la formation.
+6. Q : En combien de fois puis-je payer mon cursus DW ?  
+   R : La somme totale est strictement payable en deux échéances (2 tranches).
+7. Q : L'École 229 propose-t-elle des cours en ligne ou du soir ?  
+   R : Non. Cette formation très intensive exige votre présence physique en salle de classe (en journée pleine).
+8. Q : Je n'ai qu'un bac littéraire, est-ce pénalisant ?  
+   R : Ce n'est pas un problème ; nous n'exigeons aucun prérequis ou diplôme technique pour démarrer ce programme.
+9. Q : Quels outils de programmation concrètement vais-je travailler ?  
+   R : Vous apprendrez notamment Vue.js pour la partie visible des sites (front-end) ainsi que Laravel (PHP) et des bases de données comme MySQL.
+10. Q : L'ordinateur doit-il avoir des performances professionnelles coûteuses ?  
+    R : Non, un ordinateur portatif standard avec des performances bureautiques est largement suffisant pour commencer à programmer.

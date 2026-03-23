@@ -1,0 +1,40 @@
+DOCUMENT : 1.1 LE PARCOURS DÉVELOPPEMENT WEB ET MOBILE (DWM)
+==================================================
+
+1.1 LE PARCOURS DÉVELOPPEMENT WEB ET MOBILE (DWM)
+
+📌 Fiche Technique (DWM)
+- Nom du Programme : Développement Web et Mobile (DWM)
+- Cible / Pour qui c'est fait ? : Futurs développeurs, décrocheurs scolaires et personnes en reconversion.
+- La promesse / L'objectif principal : Devenir développeur certifié polyvalent, capable de concevoir et maintenir des applications web et mobiles multiplateformes.
+- Villes / Lieux disponibles : Cotonou
+- Durée de la formation : 12 mois
+- Coût de la formation : 800.000 FCFA
+- Modalités de paiement : Payables sur 3 tranches maximum (dont au moins 50% avant le démarrage).
+- Les compétences clés acquises : HTML, CSS, JavaScript, PHP, NodeJS, Vue.js, Laravel, MySQL, MongoDB, React Native, Flutter, iOS/Android, Git.
+- Les "Plus" ou Bonus : Stage continu de 3 mois en entreprise inclus, taux d'insertion de 93%, certification reconnue, modules "soft-skills".
+- Prérequis : Âge minimum 18 ans, ordinateur portatif obligatoire, forte motivation. Aucun prérequis technique exigé.
+- Horaires précis : Présentiel total, demande une disponibilité à temps plein en journée.
+- Date de la prochaine rentrée : Rentrées en continu (Inscription limite en cours : 28 Février 2026).
+
+💬 Questions et Réponses (DWM)
+1. Q : Qu'est-ce que le parcours Développement Web et Mobile (DWM) ?  
+   R : C'est une formation certifiante de 12 mois à Cotonou pour apprendre la création de sites internet et d'applications mobiles iOS/Android.
+2. Q : Quel est le tarif pour s'inscrire au DWM ?  
+   R : Le tarif intégral du parcours DWM est fixé à 800.000 FCFA. Nous proposons parfois des bourses via nos entreprises partenaires.
+3. Q : Puis-je payer mon inscription DWM en plusieurs fois ?  
+   R : Oui, vous pouvez régler la formation en 3 tranches maximum, avec une avance de 50% au lancement.
+4. Q : Combien de temps dure la formation DWM ?  
+   R : La formation dure 12 mois au total : 9 mois de cours intensifs suivis d'un stage de 3 mois en entreprise.
+5. Q : Faut-il déjà savoir coder pour intégrer ce programme ?  
+   R : Aucun prérequis technique n'est exigé, la formation reprend toutes les bases à partir de zéro.
+6. Q : Y a-t-il une limite d'âge pour faire le DWM ?  
+   R : Il faut avoir au moins 18 ans. Il n'y a pas de limite d'âge maximum, les reconversions professionnelles sont encouragées.
+7. Q : Proposez-vous le DWM à Parakou ?  
+   R : Non, le cursus complet de Développement Web et Mobile (DWM) n'est actuellement dispensé que sur notre campus de Cotonou.
+8. Q : Fournissez-vous les ordinateurs pendant l'apprentissage ?  
+   R : Non, chaque apprenant doit obligatoirement venir avec son propre ordinateur portatif.
+9. Q : Quels logiciels numériques allez-vous nous apprendre ?  
+   R : Vous maîtriserez Laravel et Vue.js pour la création de sites web, ainsi que Flutter et React Native pour les applications mobiles mobiles.
+10. Q : Que se passe-t-il après cette année de formation ?  
+    R : Grâce à notre taux d'insertion de 93% et au stage de 3 mois inclus, vous obtenez rapidement votre certificat et sécurisez votre entrée en entreprise.

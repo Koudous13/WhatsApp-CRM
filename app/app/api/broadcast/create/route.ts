@@ -107,6 +107,8 @@ export async function POST(req: NextRequest) {
             }, { status: 400 })
         }
 
+        console.log(`[Broadcast] Lancement de la campagne "${name}" pour ${audience.length} destinataires.`);
+
         const { data: campaign, error } = await supabase
             .from('broadcasts')
             .insert({
@@ -128,9 +130,11 @@ export async function POST(req: NextRequest) {
         if (error) throw error
 
         if (scheduledAt) {
+            console.log(`[Broadcast] Campagne planifiée pour le ${scheduledAt}`);
             return NextResponse.json({ ok: true, scheduled: true, campaignId: campaign.id })
         }
 
+        // On lance le processus en arrière-plan sans bloquer la requête
         waitUntil(sendAdvancedBroadcast(campaign.id, variants, audience, supabase))
 
         return NextResponse.json({ ok: true, campaignId: campaign.id, total: audience.length })
@@ -150,7 +154,9 @@ async function sendAdvancedBroadcast(
     let sent = 0
     let failed = 0
 
-    for (const person of audience) {
+    for (let i = 0; i < audience.length; i++) {
+        const person = audience[i]
+        
         // Choix de la variante selon le ratio (N-Split)
         const random = Math.random() * 100
         let cumulative = 0
@@ -164,24 +170,41 @@ async function sendAdvancedBroadcast(
             }
         }
 
-        // Remplacement des tags dynamiques {Tag} — insensible à la casse
+        // Remplacement sécurisé des tags dynamiques {Tag}
         let personalizedBody = selectedVariant.body
         if (person.metadata) {
             Object.entries(person.metadata).forEach(([key, val]) => {
-                const regex = new RegExp(`\\{${key}\\}`, 'gi')
+                // Échapper les caractères spéciaux de la clé pour la Regex
+                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                const regex = new RegExp(`\\{${escapedKey}\\}`, 'gi')
                 personalizedBody = personalizedBody.replace(regex, String(val || ''))
             })
         }
 
         try {
-            await sendWhatsAppMessage(person.chat_id, personalizedBody)
+            console.log(`[Broadcast ${campaignId}] Envoi à ${person.chat_id} (${i + 1}/${audience.length})`);
+            await sendWhatsAppMessage(String(person.chat_id), personalizedBody)
             sent++
-        } catch {
+        } catch (err) {
+            console.error(`[Broadcast ${campaignId}] Échec pour ${person.chat_id}:`, err);
             failed++
         }
 
+        // Mise à jour progressive du compteur dans la DB toutes les 10 personnes ou à la fin
+        if (sent % 10 === 0 || i === audience.length - 1) {
+            await supabase.from('broadcasts')
+                .update({ 
+                    sent_count: sent, 
+                    failed_count: failed,
+                    delivered_count: sent 
+                })
+                .eq('id', campaignId)
+        }
+
         // Rate limiting anti-ban (2s par message)
-        await new Promise(r => setTimeout(r, 2000))
+        if (i < audience.length - 1) {
+            await new Promise(r => setTimeout(r, 2000))
+        }
     }
 
     // Update final stats

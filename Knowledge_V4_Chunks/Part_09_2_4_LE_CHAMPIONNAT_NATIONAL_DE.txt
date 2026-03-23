@@ -1,0 +1,40 @@
+DOCUMENT : 2.4 LE CHAMPIONNAT NATIONAL DE ROBOTIQUE (CNR BJ)
+==================================================
+
+2.4 LE CHAMPIONNAT NATIONAL DE ROBOTIQUE (CNR BJ)
+
+📌 Fiche Technique (CNR BJ)
+- Nom du Programme : Championnat National de Robotique (CNR BJ)
+- Cible / Pour qui c'est fait ? : Enfants et adolescents des écoles primaires et secondaires du Bénin.
+- La promesse / L'objectif principal : Promouvoir les sciences (STIM) de manière ludique via une compétition nationale de robots.
+- Villes / Lieux disponibles : Phase finale nationale à Cotonou, regroupant des écoles de tout le pays.
+- Durée de la formation : Période de préparation de 10 semaines avant la compétition finale.
+- Coût de la formation : Dépend de l'école. Il faut contacter le support pour les détails tarifaires par équipe.
+- Modalités de paiement : Via les établissements scolaires participants.
+- Les compétences clés acquises : Ingénierie robotique, programmation et travail d'équipe sous pression.
+- Les "Plus" ou Bonus : Les vainqueurs peuvent représenter le Bénin au tournoi mondial "First Global Challenge" aux États-Unis.
+- Prérequis : Inscription via l'établissement scolaire (équipe de jeunes de 7 à 17 ans).
+- Horaires précis : Calendrier défini avec les écoles pendant et en dehors des cours.
+- Date de l'événement : Généralement entre mars et avril.
+
+💬 Questions et Réponses (CNR BJ)
+1. Q : C'est quoi le CNR ?  
+   R : Le CNR (Championnat National de Robotique) est la plus grande compétition technologique entre les écoles au Bénin.
+2. Q : Qui peut participer ?  
+   R : Tous les élèves des écoles, collèges et lycées, âgés de 7 à 17 ans.
+3. Q : Combien de temps dure la préparation ?  
+   R : Les équipes scolaires ont 10 semaines pour se préparer avant la grande finale nationale.
+4. Q : Est-ce que c'est seulement pour les écoles de Cotonou ?  
+   R : Non, c'est un championnat national. Des écoles de tout le Bénin s'affrontent lors de la finale à Cotonou.
+5. Q : Quel est le grand prix pour les gagnants ?  
+   R : Les vainqueurs ont la chance de représenter le Bénin à l'international lors du "First Global Challenge".
+6. Q : Est-ce qu'on participe seul ?  
+   R : Non, on participe toujours en équipe représentant son établissement scolaire.
+7. Q : Qu'est-ce qu'on apprend concrètement ?  
+   R : Les élèves apprennent à monter et programmer des robots pour résoudre des défis techniques chronométrés.
+8. Q : Quand a lieu la compétition finale ?  
+   R : Les épreuves finales se déroulent généralement durant les mois de mars et avril.
+9. Q : Un enfant peut-il s'inscrire sans son école ?  
+   R : Non, l'inscription doit obligatoirement passer par la direction de l'établissement scolaire.
+10. Q : Est-ce que les frais sont élevés pour les écoles ?  
+    R : Pour connaître les conditions financières exactes, la direction de l'école doit contacter l'administration de BloLab.

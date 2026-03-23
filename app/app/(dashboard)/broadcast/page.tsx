@@ -463,28 +463,32 @@ export default function BroadcastPage() {
                                   <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest mr-2 flex items-center gap-1">
                                     <Zap size={10} /> Insérer :
                                   </span>
-                                  {DB_TAGS.map(t => (
-                                    <button 
-                                      key={t.key} 
-                                      onClick={() => insertTag(t.key)}
-                                      className={cn(
-                                        "px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all hover:-translate-y-0.5 active:translate-y-0",
-                                        t.color
-                                      )}
-                                    >
-                                      {t.label}
-                                    </button>
-                                  ))}
-                                  {csvHeaders.length > 0 && <div className="h-4 w-px bg-slate-800 mx-1" />}
-                                  {csvHeaders.slice(0, 5).filter(h => !DB_TAGS.some(t => t.key === h)).map(h => (
-                                    <button 
-                                      key={h} 
-                                      onClick={() => insertTag(h)}
-                                      className="px-2.5 py-1.5 rounded-xl text-[10px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:-translate-y-0.5 transition-all"
-                                    >
-                                      CSV {h}
-                                    </button>
-                                  ))}
+                                  {csvData.length > 0 ? (
+                                    // Afficher UNIQUEMENT les tags du CSV si importé
+                                    csvHeaders.map(h => (
+                                      <button 
+                                        key={h} 
+                                        onClick={() => insertTag(h)}
+                                        className="px-2.5 py-1.5 rounded-xl text-[10px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:-translate-y-0.5 transition-all"
+                                      >
+                                        {h}
+                                      </button>
+                                    ))
+                                  ) : (
+                                    // Sinon afficher les tags standards de la DB
+                                    DB_TAGS.map(t => (
+                                      <button 
+                                        key={t.key} 
+                                        onClick={() => insertTag(t.key)}
+                                        className={cn(
+                                          "px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all hover:-translate-y-0.5 active:translate-y-0",
+                                          t.color
+                                        )}
+                                      >
+                                        {t.label}
+                                      </button>
+                                    ))
+                                  )}
                                 </div>
 
                                 <textarea 
