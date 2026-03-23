@@ -531,12 +531,11 @@ export default function BroadcastPage() {
                                   </div>
                                   {variants.reduce((a, b) => a + b.ratio, 0) !== 100 && (
                                      <button 
-                                      onClick={() => {
-                                        const remaining = 100 - variants.reduce((a, b) => a + (v.id === activeVariantId ? 0 : v.ratio) , 0); // Logic will need to be better but simpler for now:
-                                        // Auto-balance simple:
-                                        const otherSum = variants.filter(v => v.id !== activeVariantId).reduce((a,b) => a+b.ratio, 0);
-                                        setVariants(prev => prev.map(v => v.id === activeVariantId ? { ...v, ratio: Math.max(0, 100 - otherSum) } : v));
-                                      }}
+                                       onClick={() => {
+                                         // Auto-balance simple:
+                                         const otherSum = variants.filter(v => v.id !== activeVariantId).reduce((a,b) => a+b.ratio, 0);
+                                         setVariants(prev => prev.map(v => v.id === activeVariantId ? { ...v, ratio: Math.max(0, 100 - otherSum) } : v));
+                                       }}
                                       className="text-[10px] font-black text-blue-500 hover:underline"
                                      >AJUSTER AUTO</button>
                                   )}
