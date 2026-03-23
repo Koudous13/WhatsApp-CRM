@@ -75,7 +75,31 @@ export default function BroadcastPage() {
     const [savedSegments, setSavedSegments] = useState<SmartSegment[]>([])
     
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const messageRef = useRef<HTMLTextAreaElement>(null)
     const activeVariant = variants.find(v => v.id === activeVariantId) || variants[0]
+
+    function insertTag(tag: string) {
+      const tagName = `{${tag}}`
+      const textarea = messageRef.current
+      if (!textarea) {
+        setVariants(prev => prev.map(v => v.id === activeVariantId ? { ...v, body: v.body + tagName } : v))
+        return
+      }
+      
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const text = textarea.value
+      const before = text.substring(0, start)
+      const after = text.substring(end)
+      const newValue = before + tagName + after
+      
+      setVariants(prev => prev.map(v => v.id === activeVariantId ? { ...v, body: newValue } : v))
+      
+      setTimeout(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start + tagName.length, start + tagName.length)
+      }, 0)
+    }
 
     useEffect(() => { 
       loadCampaigns()
@@ -464,6 +488,7 @@ export default function BroadcastPage() {
                                 </div>
 
                                 <textarea 
+                                  ref={messageRef}
                                   value={activeVariant.body}
                                   onChange={e => setVariants(prev => prev.map(v => v.id === activeVariantId ? { ...v, body: e.target.value } : v))}
                                   className="flex-1 w-full bg-transparent p-8 py-6 text-white text-base font-medium outline-none transition-all placeholder-slate-800 resize-none leading-relaxed custom-scrollbar"
