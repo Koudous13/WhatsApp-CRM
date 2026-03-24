@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 
 // GET : Liste tous les programmes avec leurs champs
@@ -62,8 +60,8 @@ export async function POST(req: Request) {
             { programme_id: programmeId, name: 'email', type: 'text', is_required: false, display_order: 3 }
         ]
 
-        let customFieldsToInsert = [];
-        let ddlColumns = [];
+        let customFieldsToInsert: any[] = [];
+        let ddlColumns: string[] = [];
 
         if (fields && Array.isArray(fields)) {
             customFieldsToInsert = fields.map((f: any, idx: number) => ({
