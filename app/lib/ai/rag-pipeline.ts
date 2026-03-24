@@ -199,14 +199,12 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         historyFormatted.shift()
     }
 
-    // --- [2] CONTEXTE PROFIL & PROMPT DYNAMIQUE -----------------------
+    // --- [2] CONTEXTE PROFIL ---------------------------------------
     const { data: contact } = await supabase.from('Profil_Prospects').select('*').eq('chat_id', from).single()
     const promptContact = contact ? `\n## CRM Actuel de "${from}":\n` + JSON.stringify(contact, null, 2) : ''
 
-    // Récupérer le prompt système dynamique depuis la base (fallback sur le statique)
-    const { data: config } = await supabase.from('config').select('value').eq('key', 'system_prompt').maybeSingle()
-    const baseSystemPrompt = config?.value || BLOLAB_SYSTEM_PROMPT
-    const fullSystemPrompt = baseSystemPrompt + promptContact
+    // On utilise le prompt statique (la version dynamique en interface est désactivée pour le moment)
+    const fullSystemPrompt = BLOLAB_SYSTEM_PROMPT + promptContact
 
     // --- [3] BOUCLE D'AGENT DEEPSEEK --------------------------------
     let aiResponse = ''
