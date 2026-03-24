@@ -68,7 +68,7 @@ export default function ProgrammesPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: progName,
+                    nom: progName,
                     slug: progSlug,
                     fields: fields.filter(f => f.name.trim() !== '')
                 })
@@ -91,7 +91,7 @@ export default function ProgrammesPage() {
     }
 
     const handleDelete = async () => {
-        if (!programToDelete || deleteConfirmText !== programToDelete.name) return
+        if (!programToDelete || deleteConfirmText !== programToDelete.nom) return
         setIsDeleting(true)
         try {
             const res = await fetch(`/api/programmes/${programToDelete.id}`, { method: 'DELETE' })
@@ -149,7 +149,7 @@ export default function ProgrammesPage() {
 
                             <div className="flex justify-between items-start mb-4 relative z-10">
                                 <div>
-                                    <h3 className="text-xl font-bold text-white mb-1 group-hover:text-violet-300 transition-colors">{p.name}</h3>
+                                    <h3 className="text-xl font-bold text-white mb-1 group-hover:text-violet-300 transition-colors">{p.nom}</h3>
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-violet-500/10 text-violet-300 border border-violet-500/20">
                                         slug: {p.slug}
                                     </span>
@@ -311,7 +311,7 @@ export default function ProgrammesPage() {
                             </div>
                             <h2 className="text-xl font-bold text-white">Zone de Danger</h2>
                             <p className="text-sm text-slate-400 mt-2">
-                                Vous êtes sur le point de supprimer définitivement le programme <strong className="text-white">{programToDelete.name}</strong>.
+                                Vous êtes sur le point de supprimer définitivement le programme <strong className="text-white">{programToDelete.nom}</strong>.
                             </p>
                             <p className="text-xs text-red-400 mt-2 font-medium bg-red-500/10 p-2 rounded border border-red-500/20">
                                 Cela va EXÉCUTER un DROP TABLE SQL et détruire la table des inscrits associée de manière irréversible.
@@ -320,14 +320,14 @@ export default function ProgrammesPage() {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                                    Tapez <strong className="text-red-400 font-mono select-none">{programToDelete.name}</strong> pour confirmer :
+                                    Tapez <strong className="text-red-400 font-mono select-none">{programToDelete.nom}</strong> pour confirmer :
                                 </label>
                                 <input 
                                     type="text" 
                                     value={deleteConfirmText}
                                     onChange={e => setDeleteConfirmText(e.target.value)}
                                     className="w-full px-4 py-2 bg-slate-900/50 border border-red-500/30 rounded-lg text-white focus:ring-2 focus:ring-red-500 focus:outline-none transition-all font-mono placeholder-slate-700"
-                                    placeholder={programToDelete.name}
+                                    placeholder={programToDelete.nom}
                                 />
                             </div>
                             <div className="flex justify-end gap-3 pt-4 border-t border-red-500/20">
@@ -337,7 +337,7 @@ export default function ProgrammesPage() {
                                 <button 
                                     type="button" 
                                     onClick={handleDelete}
-                                    disabled={isDeleting || deleteConfirmText !== programToDelete.name} 
+                                    disabled={isDeleting || deleteConfirmText !== programToDelete.nom} 
                                     className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-red-600/20 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                 >
                                     {isDeleting ? 'Destruction...' : 'Oui, Supprimer'}

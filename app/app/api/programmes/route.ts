@@ -34,13 +34,13 @@ export async function POST(req: Request) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         )
 
-        const { name, slug, fields } = await req.json()
-        if (!name || !slug) return NextResponse.json({ error: 'Name et slug requis' }, { status: 400 })
+        const { nom, slug, fields } = await req.json()
+        if (!nom || !slug) return NextResponse.json({ error: 'Nom et slug requis' }, { status: 400 })
 
         // 1. Création du programme
         const { data: progData, error: progError } = await supabase
             .from('programmes')
-            .insert({ name, slug })
+            .insert({ nom, slug })
             .select()
             .single()
 
