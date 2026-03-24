@@ -239,8 +239,14 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     const { data: contact } = await supabase.from('Profil_Prospects').select('*').eq('chat_id', from).single()
     const promptContact = contact ? `\n## CRM Actuel de "${from}":\n` + JSON.stringify(contact, null, 2) : ''
 
-    // On utilise le prompt statique (la version dynamique en interface est désactivée pour le moment)
-    const fullSystemPrompt = BLOLAB_SYSTEM_PROMPT + promptContact
+    // --- [2.5] RECUPERATION DYNAMIQUE DES PROGRAMMES ---------------
+    const { data: activeProgrammes } = await supabase.from('programmes').select('name, slug').eq('status', 'active')
+    const promptProgrammes = activeProgrammes && activeProgrammes.length > 0
+        ? `\n## 📝 RÈGLE CRITIQUE — MAPPING DES SLUGS (PROGRAMMES ACTIFS)\nVoici la liste dynamique des programmes actuellement ouverts et leurs slugs respectifs.\nQuand tu appelles \`get_programme_requirements\` ou \`register_inscription\`, tu dois TOUJOURS utiliser l'un de ces slugs EXACTS en fonction du choix du prospect :\n` + activeProgrammes.map(p => `- S'il veut faire "${p.name}" → utilise le slug : "${p.slug}"`).join('\n')
+        : '\n## 📝 PROGRAMMES : Aucun programme actif trouvé en base.'
+
+    // On utilise le prompt statique et on y accole les données fraîches
+    const fullSystemPrompt = BLOLAB_SYSTEM_PROMPT + promptProgrammes + promptContact
 
     // --- [3] BOUCLE D'AGENT DEEPSEEK --------------------------------
     let aiResponse = ''
