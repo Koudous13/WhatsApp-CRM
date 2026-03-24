@@ -19,13 +19,13 @@ export default function Sidebar() {
     return (
         <aside className="fixed left-0 top-0 h-full w-64 flex flex-col z-50"
             style={{
-                background: 'rgba(10, 15, 30, 0.95)',
-                borderRight: '1px solid rgba(30, 58, 95, 0.6)',
-                backdropFilter: 'blur(12px)',
+                background: 'rgba(13, 10, 26, 0.92)',
+                borderRight: '1px solid rgba(139, 92, 246, 0.2)',
+                backdropFilter: 'blur(20px) saturate(180%)',
             }}>
 
             {/* Logo */}
-            <div className="p-6 border-b" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
+            <div className="p-6 border-b" style={{ borderColor: 'rgba(139, 92, 246, 0.15)' }}>
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30
             flex items-center justify-center text-xl">
@@ -39,9 +39,9 @@ export default function Sidebar() {
 
                 {/* Session badge */}
                 <div className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg"
-                    style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-dot" />
-                    <span className="text-xs text-emerald-400 font-medium">WhatsApp connecté</span>
+                    style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                    <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse-dot" />
+                    <span className="text-xs text-violet-300 font-medium">WhatsApp connecté</span>
                 </div>
             </div>
 
@@ -60,7 +60,7 @@ export default function Sidebar() {
                             <span className="text-lg">{icon}</span>
                             <span>{label}</span>
                             {active && (
-                                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-400" />
                             )}
                         </Link>
                     )
@@ -68,7 +68,7 @@ export default function Sidebar() {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
+            <div className="p-4 border-t" style={{ borderColor: 'rgba(139, 92, 246, 0.15)' }}>
                 <p className="text-xs text-slate-600 text-center">
                     BloLab • Cotonou & Parakou 🇧🇯
                 </p>
