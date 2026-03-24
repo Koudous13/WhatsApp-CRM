@@ -213,16 +213,6 @@ export default function ContactsPage() {
             alert('Erreur réseau')
         }
     }
-                setShowSaveSegment(false)
-                loadSegments()
-            }
-        } catch (e: any) {
-            alert(`Erreur inattendue: ${e.message}`)
-        } finally {
-            setSavingSegment(false)
-        }
-    }
-
     async function deleteSegment(id: string) {
         await supabase.from('Smart_Segments').delete().eq('id', id)
         loadSegments()
