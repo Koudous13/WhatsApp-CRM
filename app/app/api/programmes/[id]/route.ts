@@ -27,11 +27,41 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 }
 
+import { createClient } from '@supabase/supabase-js'
+
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params
-        const supabase = createAdminClient()
+        // Utilisation du client Supabase direct avec Service Role pour avoir le droit d'exécuter l'admin RPC
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
         
+        // 1. Récupérer le slug du programme avant de le supprimer
+        const { data: prog, error: fetchError } = await supabase
+            .from('programmes')
+            .select('slug')
+            .eq('id', id)
+            .single()
+
+        if (fetchError || !prog) {
+            return NextResponse.json({ error: 'Programme introuvable' }, { status: 404 })
+        }
+
+        const safeSlug = prog.slug.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
+        const tableName = `inscript_${safeSlug}`
+
+        // 2. Supprimer la table dynamique associée (DDL)
+        const dropSql = `DROP TABLE IF EXISTS "${tableName}";`
+        const { error: sqlError } = await supabase.rpc('admin_execute_sql', { sql_query: dropSql })
+
+        if (sqlError) {
+            console.error("Erreur lors du DROP TABLE:", sqlError)
+            return NextResponse.json({ error: "Impossible de supprimer la table d'inscrits" }, { status: 500 })
+        }
+
+        // 3. Supprimer le programme (Cascades : programme_champs seront supprimés)
         const { error } = await supabase
             .from('programmes')
             .delete()

@@ -67,6 +67,12 @@ export default function ContactsPage() {
     const [loadingInscrits, setLoadingInscrits] = useState(false)
     const activeProgramme = programmes.find((p: any) => p.slug === source)
 
+    // Inscrits CRUD
+    const [showInscritModal, setShowInscritModal] = useState(false)
+    const [editingInscrit, setEditingInscrit] = useState<any>(null)
+    const [inscritForm, setInscritForm] = useState<any>({})
+    const [savingInscrit, setSavingInscrit] = useState(false)
+
     // Colonnes du Kanban
     const KANBAN_COLUMNS = ['Nouveau', 'Qualifie', 'Interesse', 'Proposition faite', 'Inscription', 'Froid']
 
@@ -139,6 +145,74 @@ export default function ContactsPage() {
                 console.error('saveSegment error:', error)
             } else {
                 setSegmentName('')
+                setShowSaveSegment(false)
+                loadSegments()
+            }
+        } catch (e: any) {
+            alert(`Erreur inattendue: ${e.message}`)
+        } finally {
+            setSavingSegment(false)
+        }
+    }
+
+    // -- INTSCRITS CRUD LOGIC --
+    const openAddModal = () => {
+        setEditingInscrit(null)
+        setInscritForm({})
+        setShowInscritModal(true)
+    }
+
+    const openEditModal = (inscrit: any) => {
+        setEditingInscrit(inscrit)
+        setInscritForm({ ...inscrit })
+        setShowInscritModal(true)
+    }
+
+    const handleInscritChange = (key: string, value: string) => {
+        setInscritForm({ ...inscritForm, [key]: value })
+    }
+
+    const handleSaveInscrit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setSavingInscrit(true)
+        try {
+            const method = editingInscrit ? 'PUT' : 'POST'
+            const payload = { ...inscritForm }
+            if (editingInscrit) payload.id = editingInscrit.id
+
+            const res = await fetch(`/api/inscriptions/${source}`, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+
+            if (res.ok) {
+                setShowInscritModal(false)
+                loadInscrits(source) // Reload
+            } else {
+                const data = await res.json()
+                alert(data.error || 'Erreur lors de la sauvegarde')
+            }
+        } catch (err) {
+            alert('Erreur réseau')
+        } finally {
+            setSavingInscrit(false)
+        }
+    }
+
+    const handleDeleteInscrit = async (id: string) => {
+        if (!confirm('Êtes-vous sûr de vouloir supprimer cette inscription définitivement ?')) return;
+        try {
+            const res = await fetch(`/api/inscriptions/${source}?id=${id}`, { method: 'DELETE' })
+            if (res.ok) {
+                loadInscrits(source)
+            } else {
+                alert('Erreur lors de la suppression')
+            }
+        } catch (e) {
+            alert('Erreur réseau')
+        }
+    }
                 setShowSaveSegment(false)
                 loadSegments()
             }
@@ -246,11 +320,18 @@ export default function ContactsPage() {
                                     ))}
                                 </select>
 
-                                {source === 'prospects' && (
+                                {source === 'prospects' ? (
                                     <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-700/50 ml-4">
                                         <button onClick={() => setViewMode('kanban')} className={cn("px-3 py-1 text-xs font-bold rounded-md transition-all", viewMode === 'kanban' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>Kanban</button>
                                         <button onClick={() => setViewMode('list')} className={cn("px-3 py-1 text-xs font-bold rounded-md transition-all", viewMode === 'list' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>Liste</button>
                                     </div>
+                                ) : (
+                                    <button 
+                                        onClick={openAddModal}
+                                        className="ml-4 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-violet-600/20 transition-all border border-violet-500/50 flex items-center gap-1"
+                                    >
+                                        <span>+</span> Ajouter un inscrit
+                                    </button>
                                 )}
                             </div>
                             <p className="text-sm text-slate-400">
@@ -446,6 +527,7 @@ export default function ContactsPage() {
                                                 ))
                                             }
                                             <th className="text-left px-4 py-3">Date</th>
+                                            <th className="text-right px-6 py-3">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -481,6 +563,16 @@ export default function ContactsPage() {
                                                 }
                                                 <td className="px-4 py-3 text-slate-500 text-xs">
                                                     {new Date(inscrit.created_at).toLocaleDateString('fr-FR')} à {new Date(inscrit.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                </td>
+                                                <td className="px-6 py-3 text-right">
+                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => openEditModal(inscrit)} className="w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 border border-slate-700/50 transition-colors" title="Modifier">
+                                                            ✏️
+                                                        </button>
+                                                        <button onClick={() => handleDeleteInscrit(inscrit.id)} className="w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-700/50 transition-colors" title="Supprimer">
+                                                            🗑️
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -713,6 +805,68 @@ export default function ContactsPage() {
                             <p className="text-xs text-slate-300">Le profil Inscription n'a pas de vue détaillée pour l'instant. L'historique d'inscription se trouve dans la table associée.</p>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Modal CRUD Inscrits */}
+            {showInscritModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !savingInscrit && setShowInscritModal(false)} />
+                    <div className="glass-card relative w-full max-w-lg bg-[#0d0a1a] shadow-2xl p-0 animate-fadeIn overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-5 border-b border-violet-500/20 bg-[#0a0715]">
+                            <h2 className="text-xl font-bold text-white">
+                                {editingInscrit ? 'Modifier Inscription' : 'Nouvelle Inscription'}
+                            </h2>
+                            <p className="text-xs text-violet-300/60 mt-1">Programme : {activeProgramme?.name}</p>
+                        </div>
+
+                        <form onSubmit={handleSaveInscrit} className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-violet-500/20">
+                            {/* Numéro WhatsApp (Requis par le système) */}
+                            <div>
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Numéro WhatsApp *</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={inscritForm.chat_id || ''} 
+                                    onChange={e => handleInscritChange('chat_id', e.target.value)}
+                                    placeholder="ex: 22960000000"
+                                    className="w-full px-3 py-2 bg-slate-900 border border-violet-500/20 rounded-lg text-white focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder-slate-600 font-mono text-sm"
+                                    readOnly={!!editingInscrit} // On ne modifie pas la clé unique
+                                />
+                                {editingInscrit && <p className="text-[10px] text-slate-500 mt-1">L'identifiant unique ne peut pas être modifié.</p>}
+                            </div>
+
+                            {/* Génération automatique des champs du schéma */}
+                            {(activeProgramme?.programme_champs || [])
+                                .sort((a: any, b: any) => a.display_order - b.display_order)
+                                .map((field: any) => {
+                                    const safeKey = field.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+                                    return (
+                                        <div key={field.id}>
+                                            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                                                {field.name} {field.is_required && <span className="text-violet-400">*</span>}
+                                            </label>
+                                            <input 
+                                                type={field.type === 'number' ? 'number' : 'text'}
+                                                required={field.is_required}
+                                                value={inscritForm[safeKey] || ''} 
+                                                onChange={e => handleInscritChange(safeKey, e.target.value)}
+                                                className="w-full px-3 py-2 bg-slate-900 border border-violet-500/20 rounded-lg text-white focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder-slate-600 text-sm"
+                                            />
+                                        </div>
+                                    )
+                                })
+                            }
+                            <div className="pt-4">
+                                <button type="submit" disabled={savingInscrit} className="w-full px-4 py-2.5 bg-violet-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-violet-600/20 hover:bg-violet-500 disabled:opacity-50 transition-all">
+                                    {savingInscrit ? 'Enregistrement...' : 'Enregistrer pour ce programme'}
+                                </button>
+                                <button type="button" onClick={() => setShowInscritModal(false)} className="w-full px-4 py-2 mt-2 rounded-lg text-sm text-slate-400 hover:text-white transition-all">
+                                    Annuler
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
         </div>

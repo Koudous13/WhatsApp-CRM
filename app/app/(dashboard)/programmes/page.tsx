@@ -14,6 +14,11 @@ export default function ProgrammesPage() {
     const [showModal, setShowModal] = useState(false)
     const [saving, setSaving] = useState(false)
 
+    // Delete states
+    const [programToDelete, setProgramToDelete] = useState<any>(null)
+    const [deleteConfirmText, setDeleteConfirmText] = useState('')
+    const [isDeleting, setIsDeleting] = useState(false)
+
     // Form states
     const [progName, setProgName] = useState('')
     const [progSlug, setProgSlug] = useState('')
@@ -85,6 +90,26 @@ export default function ProgrammesPage() {
         }
     }
 
+    const handleDelete = async () => {
+        if (!programToDelete || deleteConfirmText !== programToDelete.name) return
+        setIsDeleting(true)
+        try {
+            const res = await fetch(`/api/programmes/${programToDelete.id}`, { method: 'DELETE' })
+            if (res.ok) {
+                setProgramToDelete(null)
+                setDeleteConfirmText('')
+                fetchProgrammes()
+            } else {
+                const data = await res.json()
+                alert(data.error || 'Erreur lors de la suppression')
+            }
+        } catch (e) {
+            alert('Erreur réseau')
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     return (
         <div className="p-8 max-w-6xl mx-auto space-y-8 animate-fadeIn">
             {/* Header */}
@@ -122,14 +147,23 @@ export default function ProgrammesPage() {
                             {/* Décoration */}
                             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-violet-400/10 transition-colors" />
 
-                            <div className="flex justify-between items-start mb-4">
+                            <div className="flex justify-between items-start mb-4 relative z-10">
                                 <div>
                                     <h3 className="text-xl font-bold text-white mb-1 group-hover:text-violet-300 transition-colors">{p.name}</h3>
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-violet-500/10 text-violet-300 border border-violet-500/20">
                                         slug: {p.slug}
                                     </span>
                                 </div>
-                                <span className={`w-2 h-2 rounded-full ${p.status === 'active' ? 'bg-emerald-400 animate-pulse-dot' : 'bg-red-400'}`} />
+                                <div className="flex items-center gap-3">
+                                    <span className={`w-2 h-2 rounded-full ${p.status === 'active' ? 'bg-emerald-400 animate-pulse-dot' : 'bg-red-400'}`} />
+                                    <button 
+                                        onClick={() => setProgramToDelete(p)}
+                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                        title="Supprimer ce programme"
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="mt-4 pt-4 border-t border-violet-500/10 flex-1">
@@ -262,6 +296,54 @@ export default function ProgrammesPage() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de suppression (Zone de danger) */}
+            {programToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !isDeleting && setProgramToDelete(null)} />
+                    <div className="glass-card relative w-full max-w-md bg-[#0d0a1a] shadow-2xl p-6 border border-red-500/30 animate-fadeIn">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-4 text-3xl">
+                                ⚠️
+                            </div>
+                            <h2 className="text-xl font-bold text-white">Zone de Danger</h2>
+                            <p className="text-sm text-slate-400 mt-2">
+                                Vous êtes sur le point de supprimer définitivement le programme <strong className="text-white">{programToDelete.name}</strong>.
+                            </p>
+                            <p className="text-xs text-red-400 mt-2 font-medium bg-red-500/10 p-2 rounded border border-red-500/20">
+                                Cela va EXÉCUTER un DROP TABLE SQL et détruire la table des inscrits associée de manière irréversible.
+                            </p>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                                    Tapez <strong className="text-red-400 font-mono select-none">{programToDelete.name}</strong> pour confirmer :
+                                </label>
+                                <input 
+                                    type="text" 
+                                    value={deleteConfirmText}
+                                    onChange={e => setDeleteConfirmText(e.target.value)}
+                                    className="w-full px-4 py-2 bg-slate-900/50 border border-red-500/30 rounded-lg text-white focus:ring-2 focus:ring-red-500 focus:outline-none transition-all font-mono placeholder-slate-700"
+                                    placeholder={programToDelete.name}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-red-500/20">
+                                <button type="button" onClick={() => setProgramToDelete(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                                    Annuler
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={handleDelete}
+                                    disabled={isDeleting || deleteConfirmText !== programToDelete.name} 
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-red-600/20 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    {isDeleting ? 'Destruction...' : 'Oui, Supprimer'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
