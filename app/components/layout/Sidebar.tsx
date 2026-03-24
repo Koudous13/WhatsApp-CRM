@@ -10,6 +10,7 @@ const NAV_ITEMS = [
     { href: '/inbox', icon: '💬', label: 'Inbox' },
     { href: '/broadcast', icon: '📢', label: 'Broadcast' },
     { href: '/contacts', icon: '👥', label: 'Contacts' },
+    { href: '/programmes', icon: '📂', label: 'Programmes' },
     { href: '/knowledge', icon: '📚', label: 'Base de connaissances' },
     { href: '/settings', icon: '⚙️', label: 'Paramètres' },
 ]

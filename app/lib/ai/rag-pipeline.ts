@@ -75,29 +75,32 @@ const tools: any = [
     {
         type: "function",
         function: {
-            name: "register_inscription",
-            description: "APPELER UNIQUEMENT quand TOUS les champs obligatoires ont été collectés pendant la conversation et que le prospect confirme vouloir s'inscrire. Enregistre l'inscription dans la base de données et notifie l'équipe admin.",
+            name: "get_programme_requirements",
+            description: "A appeler dès que le prospect choisit un programme spécifique pour savoir exactement quelles questions lui poser avant l'inscription.",
             parameters: {
                 type: "object",
                 properties: {
-                    prenom: { type: "string", description: "Prénom du prospect" },
-                    nom: { type: "string", description: "Nom de famille" },
-                    email: { type: "string", description: "Adresse email" },
-                    age: { type: "string", description: "Âge en années" },
-                    sexe: { type: "string", description: "Masculin ou Féminin" },
-                    nationalite: { type: "string", description: "Nationalité" },
-                    telephone: { type: "string", description: "Numéro de téléphone fonctionnel" },
-                    niveau_etude: { type: "string", description: "Primaire / Collège / Lycée / Université / Professionnel" },
-                    interet: { type: "string", description: "Ce qui l'intéresse chez BloLab" },
-                    programme_choisi: { type: "string", description: "ClassTech / Ecole229 / KMC / Incubateur / FabLab" },
-                    motivation: { type: "string", description: "Pourquoi veut-il s'inscrire" },
-                    comment_connu: { type: "string", description: "Comment a-t-il entendu parler de BloLab" },
-                    financeur_nom: { type: "string", description: "Nom de la personne qui finance la formation" },
-                    financeur_email: { type: "string", description: "Email du financeur" },
-                    financeur_telephone: { type: "string", description: "Téléphone du financeur" },
-                    notes_agent: { type: "string", description: "Résumé de la conversation et observations de l'agent" }
+                    programme_slug: { type: "string", description: "Le slug du programme (ex: ecole229, classtech, empowher, futurmakers)" }
                 },
-                required: ["prenom", "programme_choisi"]
+                required: ["programme_slug"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "register_inscription",
+            description: "APPELER UNIQUEMENT quand toutes les questions requises par get_programme_requirements ont été posées et répondues. Enregistre l'inscription dans la base de données spécifique au programme.",
+            parameters: {
+                type: "object",
+                properties: {
+                    programme_slug: { type: "string", description: "Le slug du programme" },
+                    donnees: { 
+                        type: "object", 
+                        description: "Objet clé-valeur JSON contenant exactement les réponses du prospect pour les champs demandés (ex: {\"prenom\": \"Paul\", \"parcours\": \"Web\"})" 
+                    }
+                },
+                required: ["programme_slug", "donnees"]
             }
         }
     }
@@ -145,22 +148,55 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
         return { result: 'Alerte envoyée.' }
     }
 
+    if (name === 'get_programme_requirements') {
+        const { data, error } = await supabase
+            .from('programmes')
+            .select(`name, slug, programme_champs(name, type, is_required)`)
+            .eq('slug', args.programme_slug.toLowerCase())
+            .single()
+        
+        if (error || !data) return { error: "⚠️ Programme non trouvé dans la base. Demande au prospect de préciser le nom du programme." }
+
+        return { 
+            instruction: `Pour inscrire ce prospect à ${data.name}, tu VAS DEVOIR LUI POSER CES QUESTIONS (une par une ou par petits blocs naturels). NE RIEN INVENTER.`,
+            champs_a_collecter: data.programme_champs
+        }
+    }
+
     if (name === 'register_inscription') {
-        // Appel de l'API inscription/create
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://whatsapp-crm-blolabparakou.vercel.app'
         try {
-            const res = await fetch(`${appUrl}/api/inscription/create`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...args, chat_id: from }),
-            })
-            const data = await res.json()
-            if (!res.ok) {
-                return { error: data.error || 'Erreur lors de l\'inscription' }
+            const slug = args.programme_slug.toLowerCase()
+            const tableName = `inscript_${slug}`
+            
+            // Format des clés de l'objet données (enlever majuscules/espaces pour correspondre aux colonnes SQL)
+            const cleanData: any = {}
+            if (args.donnees) {
+                for (const [key, value] of Object.entries(args.donnees)) {
+                    const safeKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+                    cleanData[safeKey] = value
+                }
             }
-            return { result: `Inscription enregistrée avec succès. ID: ${data.inscriptionId}. Message: ${data.message}` }
+
+            const insertData = {
+                chat_id: from,
+                telephone: from,
+                ...cleanData,
+                status: 'pending'
+            }
+            
+            const { error } = await supabase.from(tableName).upsert(insertData, { onConflict: 'chat_id' })
+            
+            if (error) {
+                if (error.code === '42P01') {
+                    return { error: `La table ${tableName} n'existe pas encore. Demande à l'admin de configurer le programme.` }
+                }
+                throw error
+            }
+            
+            await sendTelegramAlert(`✅ Nouvelle inscription dynamique [${slug}] : ${insertData.prenom || from}`)
+            return { result: "Inscription réussie et enregistrée dans la table dédiée ! Tu peux maintenant féliciter le prospect chaleureusement." }
         } catch (err: any) {
-            return { error: `Erreur réseau: ${err.message}` }
+            return { error: `Erreur interne lors de l'enregistrement : ${err.message}` }
         }
     }
 
