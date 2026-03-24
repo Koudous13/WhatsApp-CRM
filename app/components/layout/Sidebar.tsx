@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { createBrowserClient } from '@supabase/ssr'
 
 const NAV_ITEMS = [
     { href: '/analytics', icon: '📊', label: 'Analytics' },
@@ -15,6 +16,17 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
     const pathname = usePathname()
+    const router = useRouter()
+
+    async function handleLogout() {
+        const supabase = createBrowserClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+        await supabase.auth.signOut()
+        router.push('/login')
+        router.refresh()
+    }
 
     return (
         <aside className="fixed left-0 top-0 h-full w-64 flex flex-col z-50"
@@ -27,8 +39,7 @@ export default function Sidebar() {
             {/* Logo */}
             <div className="p-6 border-b" style={{ borderColor: 'rgba(139, 92, 246, 0.15)' }}>
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30
-            flex items-center justify-center text-xl">
+                    <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-xl">
                         🤖
                     </div>
                     <div>
@@ -54,8 +65,8 @@ export default function Sidebar() {
                             className={cn(
                                 'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
                                 active
-                                    ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
-                                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                                    ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30'
+                                    : 'text-slate-400 hover:bg-white/5 hover:text-violet-200'
                             )}>
                             <span className="text-lg">{icon}</span>
                             <span>{label}</span>
@@ -67,11 +78,16 @@ export default function Sidebar() {
                 })}
             </nav>
 
-            {/* Footer */}
-            <div className="p-4 border-t" style={{ borderColor: 'rgba(139, 92, 246, 0.15)' }}>
-                <p className="text-xs text-slate-600 text-center">
-                    BloLab • Cotonou & Parakou 🇧🇯
-                </p>
+            {/* Footer + Logout */}
+            <div className="p-4 border-t space-y-3" style={{ borderColor: 'rgba(139, 92, 246, 0.15)' }}>
+                <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                >
+                    <span className="text-lg">🚪</span>
+                    <span>Déconnexion</span>
+                </button>
+                <p className="text-xs text-slate-600 text-center">BloLab • Cotonou & Parakou 🇧🇯</p>
             </div>
         </aside>
     )
