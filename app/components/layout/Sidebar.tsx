@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-    { href: '/inbox', icon: '💬', label: 'Inbox' },
-    { href: '/contacts', icon: '👥', label: 'Contacts' },
-    { href: '/broadcast', icon: '📢', label: 'Broadcast' },
     { href: '/analytics', icon: '📊', label: 'Analytics' },
+    { href: '/inbox', icon: '💬', label: 'Inbox' },
+    { href: '/broadcast', icon: '📢', label: 'Broadcast' },
+    { href: '/contacts', icon: '👥', label: 'Contacts' },
     { href: '/knowledge', icon: '📚', label: 'Base de connaissances' },
     { href: '/settings', icon: '⚙️', label: 'Paramètres' },
 ]
