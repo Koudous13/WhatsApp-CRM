@@ -60,13 +60,45 @@ export default function ContactsPage() {
     const [segmentName, setSegmentName] = useState('')
     const [showSaveSegment, setShowSaveSegment] = useState(false)
 
+    // Nouvelles variables Inscriptions
+    const [source, setSource] = useState<string>('prospects')
+    const [programmes, setProgrammes] = useState<any[]>([])
+    const [inscrits, setInscrits] = useState<any[]>([])
+    const [loadingInscrits, setLoadingInscrits] = useState(false)
+    const activeProgramme = programmes.find((p: any) => p.slug === source)
+
     // Colonnes du Kanban
     const KANBAN_COLUMNS = ['Nouveau', 'Qualifie', 'Interesse', 'Proposition faite', 'Inscription', 'Froid']
 
     useEffect(() => {
         load()
         loadSegments()
+        loadProgrammes()
     }, [])
+
+    useEffect(() => {
+        if (source !== 'prospects') {
+            loadInscrits(source)
+            setViewMode('list')
+        }
+    }, [source])
+
+    async function loadProgrammes() {
+        const { data } = await supabase.from('programmes').select('*, programme_champs(*)').order('created_at', { ascending: false })
+        setProgrammes(data || [])
+    }
+
+    async function loadInscrits(slug: string) {
+        setLoadingInscrits(true)
+        const { data, error } = await supabase.from(`inscript_${slug}`).select('*').order('created_at', { ascending: false })
+        if (error) {
+            console.error(error)
+            setInscrits([])
+        } else {
+            setInscrits(data || [])
+        }
+        setLoadingInscrits(false)
+    }
 
     async function loadSegments() {
         const { data } = await supabase.from('Smart_Segments').select('*').order('created_at', { ascending: false })
@@ -199,15 +231,31 @@ export default function ContactsPage() {
                 {/* Header + filtres */}
                 <div className="p-6 border-b" style={{ borderColor: 'rgba(30, 58, 95, 0.6)' }}>
                     <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h1 className="text-xl font-bold text-white flex items-center gap-3">
-                                Contacts
-                                <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
-                                    <button onClick={() => setViewMode('kanban')} className={cn("px-3 py-1 text-xs font-bold rounded-md transition-all", viewMode === 'kanban' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>Kanban</button>
-                                    <button onClick={() => setViewMode('list')} className={cn("px-3 py-1 text-xs font-bold rounded-md transition-all", viewMode === 'list' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>Liste</button>
-                                </div>
-                            </h1>
-                            <p className="text-sm text-slate-400">{prospects.length} prospects</p>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-4 mb-1">
+                                <h1 className="text-xl font-bold text-white">Contacts</h1>
+                                <select 
+                                    value={source} 
+                                    onChange={e => setSource(e.target.value)}
+                                    className="px-3 py-1.5 rounded-lg text-sm bg-slate-900 border border-slate-700 text-slate-300 focus:outline-none focus:border-blue-500 shadow-xl"
+                                >
+                                    <option value="prospects">🌍 Tous les prospects (CRM CRM)</option>
+                                    {programmes.length > 0 && <optgroup label="✅ Inscrits par Programme" />}
+                                    {programmes.map((p: any) => (
+                                        <option key={p.slug} value={p.slug}>🎓 Inscrits : {p.name}</option>
+                                    ))}
+                                </select>
+
+                                {source === 'prospects' && (
+                                    <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-700/50 ml-4">
+                                        <button onClick={() => setViewMode('kanban')} className={cn("px-3 py-1 text-xs font-bold rounded-md transition-all", viewMode === 'kanban' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>Kanban</button>
+                                        <button onClick={() => setViewMode('list')} className={cn("px-3 py-1 text-xs font-bold rounded-md transition-all", viewMode === 'list' ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white")}>Liste</button>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-sm text-slate-400">
+                                {source === 'prospects' ? `${prospects.length} prospects` : `${inscrits.length} inscrits formels`}
+                            </p>
                         </div>
                         <div className="flex items-center gap-3">
                             {viewMode === 'kanban' && (
@@ -227,6 +275,8 @@ export default function ContactsPage() {
                     </div>
 
                     <div className="flex flex-col gap-3">
+                        {source === 'prospects' && (
+                            <>
                         {/* Ligne 1: Recherche + bouton filtres avancés */}
                         <div className="flex gap-3 items-center">
                             <input
@@ -364,12 +414,81 @@ export default function ContactsPage() {
                                 </div>
                             </div>
                         )}
+                        </>
+                    )}
                     </div>
                 </div>
 
-                {/* Contenu principal (Kanban ou Table) */}
+                {/* Contenu principal (Kanban, Table Prospects, ou Table Inscrits) */}
                 <div className="flex-1 overflow-hidden flex flex-col">
-                    {loading ? (
+                    {source !== 'prospects' ? (
+                        <div className="flex-1 overflow-y-auto">
+                            {loadingInscrits ? (
+                                <div className="p-8 text-center text-slate-500 animate-pulse">Chargement de la base d'inscrits...</div>
+                            ) : inscrits.length === 0 ? (
+                                <div className="p-12 text-center text-slate-500">
+                                    <p className="text-3xl mb-3">📭</p>
+                                    <p>Cette table d'inscription est vide.</p>
+                                    <p className="text-xs mt-1">L'IA n'a pas encore validé d'inscription pour ce programme.</p>
+                                </div>
+                            ) : (
+                                <table className="w-full text-sm">
+                                    <thead className="sticky top-0" style={{ background: 'rgba(10, 15, 30, 0.95)', zIndex: 10 }}>
+                                        <tr className="text-slate-400 text-xs uppercase">
+                                            <th className="text-left px-6 py-3">Inscrit</th>
+                                            <th className="text-left px-4 py-3">N° Téléphone</th>
+                                            {/* Champs dynamiques du programme */}
+                                            {(activeProgramme?.programme_champs || [])
+                                                .sort((a: any, b: any) => a.display_order - b.display_order)
+                                                .filter((f: any) => !['prenom','nom','telephone','email'].includes(f.name.toLowerCase())) // On exclut les champs de base d'en-tête
+                                                .map((f: any) => (
+                                                    <th key={f.id} className="text-left px-4 py-3 text-violet-300 font-semibold">{f.name}</th>
+                                                ))
+                                            }
+                                            <th className="text-left px-4 py-3">Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {inscrits.map((inscrit: any) => (
+                                            <tr key={inscrit.id} className="border-b group hover:bg-white/5 transition-colors" style={{ borderColor: 'rgba(30, 58, 95, 0.3)' }}>
+                                                <td className="px-6 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-violet-600/30 flex items-center justify-center text-xs font-bold text-violet-300 border border-violet-500/30">
+                                                            {getInitials(inscrit.prenom, inscrit.nom)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-white">{inscrit.prenom} {inscrit.nom}</p>
+                                                            <p className="text-[10px] text-slate-500">{inscrit.email || 'Pas d\'email'}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 font-mono text-slate-300">{inscrit.chat_id}</td>
+                                                
+                                                {/* Contenu des colonnes dynamiques */}
+                                                {(activeProgramme?.programme_champs || [])
+                                                    .sort((a: any, b: any) => a.display_order - b.display_order)
+                                                    .filter((f: any) => !['prenom','nom','telephone','email'].includes(f.name.toLowerCase()))
+                                                    .map((f: any) => {
+                                                        const safeKey = f.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+                                                        return (
+                                                            <td key={f.id} className="px-4 py-3 text-slate-300">
+                                                                <span className="px-2 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-xs text-violet-200">
+                                                                    {inscrit[safeKey] || '—'}
+                                                                </span>
+                                                            </td>
+                                                        )
+                                                    })
+                                                }
+                                                <td className="px-4 py-3 text-slate-500 text-xs">
+                                                    {new Date(inscrit.created_at).toLocaleDateString('fr-FR')} à {new Date(inscrit.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    ) : loading ? (
                         <div className="p-8 text-center text-slate-500">Chargement...</div>
                     ) : viewMode === 'kanban' ? (
                         <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 flex gap-4 h-full scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
@@ -586,6 +705,12 @@ export default function ContactsPage() {
                         <div className="glass-card p-3">
                             <p className="text-xs text-slate-400 mb-1">📝 Notes admin</p>
                             <p className="text-xs text-slate-300">{selected.notes}</p>
+                        </div>
+                    )}
+                    {source !== 'prospects' && (
+                        <div className="glass-card p-3 mt-4 border border-violet-500/30">
+                            <p className="text-xs text-violet-400 mb-1">⚠️ Inscription</p>
+                            <p className="text-xs text-slate-300">Le profil Inscription n'a pas de vue détaillée pour l'instant. L'historique d'inscription se trouve dans la table associée.</p>
                         </div>
                     )}
                 </div>
