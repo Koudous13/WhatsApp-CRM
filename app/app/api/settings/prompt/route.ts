@@ -19,12 +19,14 @@ export async function GET() {
         if (error) {
             // Tentative de création si la table manque
             if (error.message.includes('relation "config" does not exist')) {
-                await supabase.rpc('admin_execute_sql', {
-                    sql_query: `
-                        CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ DEFAULT now());
-                        INSERT INTO config (key, value) VALUES ('system_prompt', $PROMPT$${BLOLAB_SYSTEM_PROMPT}$PROMPT$) ON CONFLICT DO NOTHING;
-                    `
-                }).catch(e => console.error('Silent SQL Error:', e))
+                try {
+                    await supabase.rpc('admin_execute_sql', {
+                        sql_query: `
+                            CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ DEFAULT now());
+                            INSERT INTO config (key, value) VALUES ('system_prompt', $PROMPT$${BLOLAB_SYSTEM_PROMPT}$PROMPT$) ON CONFLICT DO NOTHING;
+                        `
+                    })
+                } catch (e) { console.error('Silent SQL Error:', e) }
                 return NextResponse.json({ value: BLOLAB_SYSTEM_PROMPT, isDefault: true })
             }
             // En cas d'autre erreur (ex: permissions), on renvoie quand même le défaut pour ne pas bloquer l'UI
