@@ -61,25 +61,42 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
             return newRow
         });
 
-        const { data, error } = await supabase
-            .from(tableName)
-            .upsert(rowsToInsert, { onConflict: 'chat_id' })
-            .select()
+        // Construction du SQL INSERT multi-lignes pour contourner le cache
+        const allColumns = Array.from(new Set(rowsToInsert.flatMap(r => Object.keys(r))));
+        const columnsSql = allColumns.map(c => `"${c}"`).join(', ');
+        const valuesSql = rowsToInsert.map(row => {
+            const vals = allColumns.map(col => {
+                const val = row[col];
+                if (val === undefined || val === null) return 'NULL';
+                if (typeof val === 'number') return val;
+                return `'${String(val).replace(/'/g, "''")}'`;
+            });
+            return `(${vals.join(', ')})`;
+        }).join(', ');
+
+        const bulkInsertSql = `
+            INSERT INTO "${tableName}" (${columnsSql})
+            VALUES ${valuesSql}
+            ON CONFLICT (chat_id) DO UPDATE SET
+            ${allColumns.filter(c => c !== 'chat_id' && c !== 'id').map(c => `"${c}" = EXCLUDED."${c}"`).join(', ')};
+        `;
+
+        const { data: insertResult, error } = await supabase.rpc('admin_execute_sql', { sql_query: bulkInsertSql });
 
         if (error) {
-            console.error("[ERROR] Bulk Import failed:", error);
+            console.error("[ERROR] Bulk Import failed (SQL):", error);
             return NextResponse.json({ 
                 error: error.message, 
                 debugInfo: {
                     rowCount: rowsToInsert.length,
-                    firstRow: rowsToInsert[0],
-                    mapping: headerMapping
+                    mapping: headerMapping,
+                    sql: bulkInsertSql.substring(0, 500) + "..."
                 }
             }, { status: 500 })
         }
 
-        console.log(`[DEBUG] Bulk Import réussi : ${data.length} lignes.`);
-        return NextResponse.json({ success: true, count: data.length, data })
+        console.log(`[DEBUG] Bulk Import SQL réussi : ${rowsToInsert.length} lignes.`);
+        return NextResponse.json({ success: true, count: rowsToInsert.length, data: rowsToInsert })
     } catch (error: any) {
         console.error(`Erreur POST /api/inscriptions/${await params.then(p => p.slug)}/bulk:`, error)
         return NextResponse.json({ error: error.message }, { status: 500 })

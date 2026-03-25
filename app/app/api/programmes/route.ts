@@ -119,14 +119,11 @@ export async function POST(req: Request) {
             const crypto = require('crypto');
             const rowsToInsert = initialData.map((row, idx) => {
                 const newRow: any = {}
-                
-                // On mappe chaque champ du CSV vers sa version SQL
                 Object.keys(row).forEach(originalKey => {
                     const sqlKey = headerMapping[originalKey] || originalKey.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
                     newRow[sqlKey] = row[originalKey]
                 })
 
-                // S'assurer qu'il y a un chat_id unique
                 const phoneKeys = Object.keys(newRow).filter(k => 
                     k.includes('phone') || k.includes('t_l_phone') || k.includes('tel') || k === 'numero' || k === 'chat_id' || k === 'whatsapp'
                 );
@@ -138,36 +135,55 @@ export async function POST(req: Request) {
                 } else {
                      newRow.chat_id = String(newRow.chat_id).replace(/\D/g, '')
                 }
-                
-                if (idx === 0) console.log(`[DEBUG] Exemple de ligne mappée (ligne 1) :`, newRow);
                 return newRow
             });
 
-            const { data: insertResult, error: insertError } = await supabase
-                .from(tableName)
-                .upsert(rowsToInsert, { onConflict: 'chat_id' })
-                .select()
+            // Conversion des lignes en SQL INSERT pour contourner le cache PostgREST (Schema Cache)
+            // On utilise jsonb_populate_recordset si possible, ou une construction manuelle.
+            // La méthode la plus sûre sans dépendre du type est de construire la requête VALUES.
+            const allColumns = Array.from(new Set(rowsToInsert.flatMap(r => Object.keys(r))));
+            const columnsSql = allColumns.map(c => `"${c}"`).join(', ');
+            
+            const valuesSql = rowsToInsert.map(row => {
+                const vals = allColumns.map(col => {
+                    const val = row[col];
+                    if (val === undefined || val === null) return 'NULL';
+                    if (typeof val === 'number') return val;
+                    return `'${String(val).replace(/'/g, "''")}'`;
+                });
+                return `(${vals.join(', ')})`;
+            }).join(', ');
+
+            const bulkInsertSql = `
+                INSERT INTO "${tableName}" (${columnsSql})
+                VALUES ${valuesSql}
+                ON CONFLICT (chat_id) DO UPDATE SET
+                ${allColumns.filter(c => c !== 'chat_id' && c !== 'id').map(c => `"${c}" = EXCLUDED."${c}"`).join(', ')};
+            `;
+
+            const { error: insertError } = await supabase.rpc('admin_execute_sql', { sql_query: bulkInsertSql });
 
             if (insertError) {
-                console.error("[ERROR] Erreur lors de l'insertion (initialData):", insertError)
+                console.error("[ERROR] Erreur lors de l'insertion SQL direct (initialData):", insertError)
                 return NextResponse.json({ 
                     success: true, 
                     programme: progData, 
                     tableName, 
                     debugInfo: {
                         rowCount: rowsToInsert.length,
-                        firstRow: rowsToInsert[0],
-                        error: insertError
+                        error: insertError,
+                        sql: bulkInsertSql.substring(0, 500) + "..."
                     },
-                    warning: "Data import failed: " + insertError.message 
+                    warning: "SQL Data import failed: " + insertError.message 
                 })
             }
-            console.log(`[DEBUG] Insertion réussie : ${insertResult?.length || 0} lignes insérées.`);
+            
+            console.log(`[DEBUG] Insertion SQL direct réussie pour ${tableName}.`);
             return NextResponse.json({ 
                 success: true, 
                 programme: progData, 
                 tableName, 
-                importedCount: insertResult?.length || 0 
+                importedCount: rowsToInsert.length 
             })
         }
 
