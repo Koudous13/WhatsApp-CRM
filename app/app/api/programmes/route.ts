@@ -34,7 +34,7 @@ export async function POST(req: Request) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         )
 
-        const { nom, slug, fields } = await req.json()
+        const { nom, slug, fields, initialData } = await req.json()
         if (!nom || !slug) return NextResponse.json({ error: 'Nom et slug requis' }, { status: 400 })
 
         // 1. Création du programme
@@ -45,21 +45,13 @@ export async function POST(req: Request) {
             .single()
 
         if (progError) {
-            // Gérer le doublon de slug spécifiquement
             if (progError.code === '23505') return NextResponse.json({ error: 'Ce slug existe déjà' }, { status: 400 })
             throw progError
         }
 
         const programmeId = progData.id
 
-        // 2. Préparation des champs de base + champs personnalisés
-        // Les champs de base sont toujours demandés par Laura
-        const baseFields = [
-            { programme_id: programmeId, name: 'prenom', type: 'text', is_required: true, display_order: 1 },
-            { programme_id: programmeId, name: 'nom', type: 'text', is_required: true, display_order: 2 },
-            { programme_id: programmeId, name: 'email', type: 'text', is_required: false, display_order: 3 }
-        ]
-
+        // 2. Préparation des champs dynamiques UNIQUEMENT
         let customFieldsToInsert: any[] = [];
         let ddlColumns: string[] = [];
 
@@ -70,44 +62,36 @@ export async function POST(req: Request) {
                 type: f.type || 'text',
                 options: f.options || null,
                 is_required: f.is_required !== false,
-                display_order: 4 + idx
+                display_order: idx + 1
             }))
 
             ddlColumns = fields.map((f: any) => {
                 const sqlType = f.type === 'number' ? 'NUMERIC' : 'TEXT'
-                // On met tout le reste en TEXT car Supabase gère très bien le texte, 
-                // et l'IA envoie souvent du texte.
                 const safeName = f.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
                 return `"${safeName}" ${sqlType}`
             })
         }
 
-        const allFieldsToInsert = [...baseFields, ...customFieldsToInsert]
+        if (customFieldsToInsert.length > 0) {
+            const { error: fieldsError } = await supabase
+                .from('programme_champs')
+                .insert(customFieldsToInsert)
 
-        const { error: fieldsError } = await supabase
-            .from('programme_champs')
-            .insert(allFieldsToInsert)
-
-        if (fieldsError) throw fieldsError
+            if (fieldsError) throw fieldsError
+        }
 
         // 3. Génération dynamique de la table d'inscription (DDL)
-        // inscript_slug
         const safeSlug = slug.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
         const tableName = `inscript_${safeSlug}`
 
-        const customColumnsSql = ddlColumns.length > 0 ? ',\n' + ddlColumns.join(',\n') : ''
+        const customColumnsSql = ddlColumns.length > 0 ? ',\n                ' + ddlColumns.join(',\n                ') : ''
 
         const createTableSql = `
             CREATE TABLE IF NOT EXISTS "${tableName}" (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 chat_id TEXT UNIQUE NOT NULL,
-                telephone TEXT,
-                prenom TEXT,
-                nom TEXT,
-                email TEXT,
                 status TEXT DEFAULT 'pending',
-                created_at TIMESTAMPTZ DEFAULT now()
-                ${customColumnsSql}
+                created_at TIMESTAMPTZ DEFAULT now()${customColumnsSql}
             );
         `
 
@@ -116,6 +100,32 @@ export async function POST(req: Request) {
         if (sqlError) {
             console.error("Erreur lors de la création de la table:", sqlError)
             throw sqlError
+        }
+
+        // 4. Insertion des données initiales depuis le CSV (Importation)
+        if (initialData && Array.isArray(initialData) && initialData.length > 0) {
+            // Nettoyage et préparation des lignes (ajout d'un chat_id par défaut si absent pour éviter le plantage)
+            const crypto = require('crypto');
+            const rowsToInsert = initialData.map(row => {
+                // S'assurer qu'il y a un chat_id unique (on peut utiliser un numéro de téléphone s'il y a une colonne qui y ressemble, sinon un UUID)
+                const phoneKeys = Object.keys(row).filter(k => k.toLowerCase().includes('phone') || k.toLowerCase().includes('téléphone') || k.toLowerCase().includes('tel') || k.toLowerCase() === 'numero');
+                const defaultChatId = phoneKeys.length > 0 && row[phoneKeys[0]] ? String(row[phoneKeys[0]]) : crypto.randomUUID();
+                
+                return {
+                    ...row,
+                    chat_id: row.chat_id || defaultChatId,
+                }
+            });
+
+            const { error: insertError } = await supabase
+                .from(tableName)
+                .insert(rowsToInsert)
+
+            if (insertError) {
+                console.error("Erreur lors de l'insertion en masse (initialData):", insertError)
+                // On ne bloque pas la réponse, la table est créée, mais on renvoie l'erreur
+                return NextResponse.json({ success: true, programme: progData, tableName, warning: "Data import failed" })
+            }
         }
 
         return NextResponse.json({ success: true, programme: progData, tableName })
