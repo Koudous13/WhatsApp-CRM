@@ -35,7 +35,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
         })
 
         // 2. Mapper les lignes du CSV
-        const rowsToInsert = rows.map(row => {
+        console.log(`[DEBUG] Bulk Import pour ${tableName} : ${rows.length} lignes reçues.`);
+        const rowsToInsert = rows.map((row, idx) => {
             const newRow: any = {}
             
             Object.keys(row).forEach(originalKey => {
@@ -45,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
             // WhatsApp / Chat ID logic
             const phoneKeys = Object.keys(newRow).filter(k => 
-                k.includes('phone') || k.includes('t_l_phone') || k.includes('tel') || k === 'numero' || k === 'chat_id'
+                k.includes('phone') || k.includes('t_l_phone') || k.includes('tel') || k === 'numero' || k === 'chat_id' || k === 'whatsapp'
             );
             
             if (!newRow.chat_id) {
@@ -56,6 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
                 newRow.chat_id = String(newRow.chat_id).replace(/\D/g, '')
             }
             
+            if (idx === 0) console.log(`[DEBUG] Exemple de ligne mappée (Bulk) :`, newRow);
             return newRow
         });
 
@@ -64,8 +66,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
             .upsert(rowsToInsert, { onConflict: 'chat_id' })
             .select()
 
-        if (error) throw error
+        if (error) {
+            console.error("[ERROR] Bulk Import failed:", error);
+            return NextResponse.json({ 
+                error: error.message, 
+                debugInfo: {
+                    rowCount: rowsToInsert.length,
+                    firstRow: rowsToInsert[0],
+                    mapping: headerMapping
+                }
+            }, { status: 500 })
+        }
 
+        console.log(`[DEBUG] Bulk Import réussi : ${data.length} lignes.`);
         return NextResponse.json({ success: true, count: data.length, data })
     } catch (error: any) {
         console.error(`Erreur POST /api/inscriptions/${await params.then(p => p.slug)}/bulk:`, error)

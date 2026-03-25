@@ -104,6 +104,8 @@ export async function POST(req: Request) {
 
         // 4. Insertion des données initiales depuis le CSV (Importation)
         if (initialData && Array.isArray(initialData) && initialData.length > 0) {
+            console.log(`[DEBUG] Importation initiale pour ${tableName} : ${initialData.length} lignes reçues.`);
+            
             // Création d'un dictionnaire de mapping : Nom Original -> Nom SQL
             const headerMapping: Record<string, string> = {}
             if (fields && Array.isArray(fields)) {
@@ -112,9 +114,10 @@ export async function POST(req: Request) {
                     headerMapping[f.name] = safeName
                 })
             }
+            console.log(`[DEBUG] Mapping des colonnes :`, headerMapping);
 
             const crypto = require('crypto');
-            const rowsToInsert = initialData.map(row => {
+            const rowsToInsert = initialData.map((row, idx) => {
                 const newRow: any = {}
                 
                 // On mappe chaque champ du CSV vers sa version SQL
@@ -125,7 +128,7 @@ export async function POST(req: Request) {
 
                 // S'assurer qu'il y a un chat_id unique
                 const phoneKeys = Object.keys(newRow).filter(k => 
-                    k.includes('phone') || k.includes('t_l_phone') || k.includes('tel') || k === 'numero' || k === 'chat_id'
+                    k.includes('phone') || k.includes('t_l_phone') || k.includes('tel') || k === 'numero' || k === 'chat_id' || k === 'whatsapp'
                 );
                 
                 if (!newRow.chat_id) {
@@ -136,17 +139,36 @@ export async function POST(req: Request) {
                      newRow.chat_id = String(newRow.chat_id).replace(/\D/g, '')
                 }
                 
+                if (idx === 0) console.log(`[DEBUG] Exemple de ligne mappée (ligne 1) :`, newRow);
                 return newRow
             });
 
-            const { error: insertError } = await supabase
+            const { data: insertResult, error: insertError } = await supabase
                 .from(tableName)
                 .upsert(rowsToInsert, { onConflict: 'chat_id' })
+                .select()
 
             if (insertError) {
-                console.error("Erreur lors de l'insertion en masse (initialData):", insertError)
-                return NextResponse.json({ success: true, programme: progData, tableName, warning: "Data import failed: " + insertError.message })
+                console.error("[ERROR] Erreur lors de l'insertion (initialData):", insertError)
+                return NextResponse.json({ 
+                    success: true, 
+                    programme: progData, 
+                    tableName, 
+                    debugInfo: {
+                        rowCount: rowsToInsert.length,
+                        firstRow: rowsToInsert[0],
+                        error: insertError
+                    },
+                    warning: "Data import failed: " + insertError.message 
+                })
             }
+            console.log(`[DEBUG] Insertion réussie : ${insertResult?.length || 0} lignes insérées.`);
+            return NextResponse.json({ 
+                success: true, 
+                programme: progData, 
+                tableName, 
+                importedCount: insertResult?.length || 0 
+            })
         }
 
         return NextResponse.json({ success: true, programme: progData, tableName })
