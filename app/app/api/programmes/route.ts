@@ -104,27 +104,48 @@ export async function POST(req: Request) {
 
         // 4. Insertion des données initiales depuis le CSV (Importation)
         if (initialData && Array.isArray(initialData) && initialData.length > 0) {
-            // Nettoyage et préparation des lignes (ajout d'un chat_id par défaut si absent pour éviter le plantage)
+            // Création d'un dictionnaire de mapping : Nom Original -> Nom SQL
+            const headerMapping: Record<string, string> = {}
+            if (fields && Array.isArray(fields)) {
+                fields.forEach(f => {
+                    const safeName = f.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+                    headerMapping[f.name] = safeName
+                })
+            }
+
             const crypto = require('crypto');
             const rowsToInsert = initialData.map(row => {
-                // S'assurer qu'il y a un chat_id unique (on peut utiliser un numéro de téléphone s'il y a une colonne qui y ressemble, sinon un UUID)
-                const phoneKeys = Object.keys(row).filter(k => k.toLowerCase().includes('phone') || k.toLowerCase().includes('téléphone') || k.toLowerCase().includes('tel') || k.toLowerCase() === 'numero');
-                const defaultChatId = phoneKeys.length > 0 && row[phoneKeys[0]] ? String(row[phoneKeys[0]]) : crypto.randomUUID();
+                const newRow: any = {}
                 
-                return {
-                    ...row,
-                    chat_id: row.chat_id || defaultChatId,
+                // On mappe chaque champ du CSV vers sa version SQL
+                Object.keys(row).forEach(originalKey => {
+                    const sqlKey = headerMapping[originalKey] || originalKey.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+                    newRow[sqlKey] = row[originalKey]
+                })
+
+                // S'assurer qu'il y a un chat_id unique
+                const phoneKeys = Object.keys(newRow).filter(k => 
+                    k.includes('phone') || k.includes('t_l_phone') || k.includes('tel') || k === 'numero' || k === 'chat_id'
+                );
+                
+                if (!newRow.chat_id) {
+                    newRow.chat_id = phoneKeys.length > 0 && newRow[phoneKeys[0]] 
+                        ? String(newRow[phoneKeys[0]]).replace(/\D/g, '') 
+                        : crypto.randomUUID();
+                } else {
+                     newRow.chat_id = String(newRow.chat_id).replace(/\D/g, '')
                 }
+                
+                return newRow
             });
 
             const { error: insertError } = await supabase
                 .from(tableName)
-                .insert(rowsToInsert)
+                .upsert(rowsToInsert, { onConflict: 'chat_id' })
 
             if (insertError) {
                 console.error("Erreur lors de l'insertion en masse (initialData):", insertError)
-                // On ne bloque pas la réponse, la table est créée, mais on renvoie l'erreur
-                return NextResponse.json({ success: true, programme: progData, tableName, warning: "Data import failed" })
+                return NextResponse.json({ success: true, programme: progData, tableName, warning: "Data import failed: " + insertError.message })
             }
         }
 

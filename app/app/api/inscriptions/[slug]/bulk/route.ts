@@ -19,27 +19,46 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
         const safeSlug = slug.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
         const tableName = `inscript_${safeSlug}`
 
-        // Pour chaque ligne, si pas de chat_id, on en génère un ou on en récupère un des numéros de téléphone fournis
+        // 1. Récupérer les champs du programme pour le mapping
+        const { data: prog, error: progErr } = await supabase
+            .from('programmes')
+            .select('*, programme_champs(*)')
+            .eq('slug', slug)
+            .single()
+
+        if (progErr || !prog) throw new Error("Programme introuvable")
+
+        const headerMapping: Record<string, string> = {}
+        prog.programme_champs.forEach((f: any) => {
+            const safeName = f.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+            headerMapping[f.name] = safeName
+        })
+
+        // 2. Mapper les lignes du CSV
         const rowsToInsert = rows.map(row => {
-            const phoneKeys = Object.keys(row).filter(k => 
-                k.toLowerCase().includes('phone') || 
-                k.toLowerCase().includes('téléphone') || 
-                k.toLowerCase().includes('tel') || 
-                k.toLowerCase() === 'numero'
+            const newRow: any = {}
+            
+            Object.keys(row).forEach(originalKey => {
+                const sqlKey = headerMapping[originalKey] || originalKey.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+                newRow[sqlKey] = row[originalKey]
+            })
+
+            // WhatsApp / Chat ID logic
+            const phoneKeys = Object.keys(newRow).filter(k => 
+                k.includes('phone') || k.includes('t_l_phone') || k.includes('tel') || k === 'numero' || k === 'chat_id'
             );
             
-            const defaultChatId = phoneKeys.length > 0 && row[phoneKeys[0]] 
-                ? String(row[phoneKeys[0]]) 
-                : crypto.randomUUID();
-            
-            return {
-                ...row,
-                chat_id: row.chat_id || defaultChatId,
+            if (!newRow.chat_id) {
+                newRow.chat_id = phoneKeys.length > 0 && newRow[phoneKeys[0]] 
+                    ? String(newRow[phoneKeys[0]]).replace(/\D/g, '') 
+                    : crypto.randomUUID();
+            } else {
+                newRow.chat_id = String(newRow.chat_id).replace(/\D/g, '')
             }
+            
+            return newRow
         });
 
-        // Utilisation de count="exact" ou simplement insert normal. 
-        // Si un chat_id est dupliqué, on peut utiliser upsert pour mettre à jour
         const { data, error } = await supabase
             .from(tableName)
             .upsert(rowsToInsert, { onConflict: 'chat_id' })
