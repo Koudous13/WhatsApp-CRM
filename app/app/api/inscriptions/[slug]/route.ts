@@ -1,6 +1,32 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
+    try {
+        const { slug } = await params
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+
+        const safeSlug = slug.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
+        const tableName = `inscript_${safeSlug}`
+
+        const { data, error } = await supabase
+            .from(tableName)
+            .select('*')
+            .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        return NextResponse.json(data)
+    } catch (error: any) {
+        console.error(`Erreur GET /api/inscriptions/${await params.then(p => p.slug)}:`, error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+}
+
+
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
     try {
         const { slug } = await params
