@@ -151,14 +151,14 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
     if (name === 'get_programme_requirements') {
         const { data, error } = await supabase
             .from('programmes')
-            .select(`name, slug, programme_champs(name, type, is_required)`)
+            .select(`nom, slug, programme_champs(name, type, is_required)`)
             .eq('slug', args.programme_slug.toLowerCase())
             .single()
         
         if (error || !data) return { error: "⚠️ Programme non trouvé dans la base. Demande au prospect de préciser le nom du programme." }
 
         return { 
-            instruction: `Pour inscrire ce prospect à ${data.name}, tu VAS DEVOIR LUI POSER CES QUESTIONS (une par une ou par petits blocs naturels). NE RIEN INVENTER.`,
+            instruction: `Pour inscrire ce prospect à ${data.nom}, tu VAS DEVOIR LUI POSER CES QUESTIONS (une par une ou par petits blocs naturels). NE RIEN INVENTER.`,
             champs_a_collecter: data.programme_champs
         }
     }
