@@ -166,37 +166,98 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
     if (name === 'register_inscription') {
         try {
             const slug = args.programme_slug.toLowerCase()
-            const tableName = `inscript_${slug}`
-            
-            // Format des clés de l'objet données (enlever majuscules/espaces pour correspondre aux colonnes SQL)
-            const cleanData: any = {}
-            if (args.donnees) {
-                for (const [key, value] of Object.entries(args.donnees)) {
-                    const safeKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
-                    cleanData[safeKey] = value
+            const safeSlug = slug.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
+            const tableName = `inscript_${safeSlug}`
+
+            // 1. Récupérer les champs réels du programme pour le mapping
+            const { data: prog } = await supabase
+                .from('programmes')
+                .select('programme_champs(name)')
+                .eq('slug', slug)
+                .single()
+
+            // Construire un dictionnaire : clé sanitizée -> nom colonne SQL réel
+            const columnMapping: Record<string, string> = {}
+            if (prog?.programme_champs) {
+                for (const champ of prog.programme_champs as any[]) {
+                    const sqlCol = champ.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+                    // Mapper plusieurs variantes vers la vraie colonne
+                    columnMapping[sqlCol] = sqlCol               // exact
+                    columnMapping[champ.name.toLowerCase()] = sqlCol  // lowercase original
+                    // Variantes anglais/français courants
+                    const aliases: Record<string, string[]> = {
+                        'prenom': ['firstname', 'first_name', 'prénom'],
+                        'nom': ['lastname', 'last_name', 'surname'],
+                        'niveau___tudes': ['educationlevel', 'education_level', 'niveau_etudes', 'level'],
+                        'date_naissance': ['birthdate', 'birth_date', 'dob', 'date_de_naissance'],
+                        'lieu_naissance': ['birthplace', 'birth_place', 'lieu_de_naissance'],
+                        'genre': ['gender', 'sexe', 'sex'],
+                        'motivation': ['motivations', 'reason', 'raison'],
+                        'source': ['comment_connu', 'how_did_you_hear', 'reference'],
+                        'attentes': ['expectations', 'expectation', 'attente'],
+                        'session': ['annee', 'year', 'promotion'],
+                    }
+                    for (const [col, aliasList] of Object.entries(aliases)) {
+                        if (sqlCol.includes(col) || col.includes(sqlCol.replace(/_+/g, ''))) {
+                            for (const alias of aliasList) {
+                                columnMapping[alias] = sqlCol
+                            }
+                        }
+                    }
                 }
             }
 
-            const insertData = {
+            // 2. Construire l'objet données en mappant les clés de l'IA vers les vraies colonnes
+            const insertData: Record<string, any> = {
                 chat_id: from,
-                telephone: from,
-                ...cleanData,
-                status: 'pending'
+                status: 'pending',
             }
-            
-            const { error } = await supabase.from(tableName).upsert(insertData, { onConflict: 'chat_id' })
-            
-            if (error) {
-                if (error.code === '42P01') {
-                    return { error: `La table ${tableName} n'existe pas encore. Demande à l'admin de configurer le programme.` }
+
+            if (args.donnees) {
+                for (const [key, value] of Object.entries(args.donnees)) {
+                    const sanitizedKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+                    // Chercher la vraie colonne dans le mapping, sinon utiliser la clé sanitizée
+                    const realCol = columnMapping[sanitizedKey] || columnMapping[key.toLowerCase()] || sanitizedKey
+                    insertData[realCol] = value
                 }
-                throw error
             }
-            
-            await sendTelegramAlert(`✅ Nouvelle inscription dynamique [${slug}] : ${insertData.prenom || from}`)
-            return { result: "Inscription réussie et enregistrée dans la table dédiée ! Tu peux maintenant féliciter le prospect chaleureusement." }
+
+            // 3. Construire le SQL INSERT pour contourner le cache PostgREST
+            const allColumns = Object.keys(insertData)
+            const columnsSql = allColumns.map(c => `"${c}"`).join(', ')
+            const valuesSql = allColumns.map(col => {
+                const val = insertData[col]
+                if (val === undefined || val === null) return 'NULL'
+                if (typeof val === 'number') return val
+                return `'${String(val).replace(/'/g, "''")}'`
+            }).join(', ')
+
+            const updateSet = allColumns
+                .filter(c => c !== 'chat_id' && c !== 'id')
+                .map(c => `"${c}" = EXCLUDED."${c}"`)
+                .join(', ')
+
+            const insertSql = `
+                INSERT INTO "${tableName}" (${columnsSql})
+                VALUES (${valuesSql})
+                ON CONFLICT (chat_id) DO UPDATE SET ${updateSet};
+            `
+
+            const { error: sqlError } = await supabase.rpc('admin_execute_sql', { sql_query: insertSql })
+
+            if (sqlError) {
+                console.error('[ERROR] register_inscription SQL failed:', sqlError, 'Data:', insertData)
+                await sendTelegramAlert(
+                    `⚠️ ALERTE INSCRIPTION ${slug.toUpperCase()} - Problème technique\n\nProspect: ${insertData.prenom || ''} ${insertData.nom || ''}\nTéléphone: ${from}\nEmail: ${insertData.email || 'N/A'}\n\nErreur: "${sqlError.message}"\n\nDonnées fournies:\n${Object.entries(insertData).filter(([k]) => !['chat_id','status'].includes(k)).map(([k,v]) => `- ${k}: ${v}`).join('\n')}`
+                )
+                return { error: `Erreur lors de l'enregistrement : ${sqlError.message}. L'équipe a été alertée.` }
+            }
+
+            await sendTelegramAlert(`✅ Nouvelle inscription [${slug}] : ${insertData.prenom || ''} ${insertData.nom || ''} (${from})`)
+            return { result: "Inscription réussie et enregistrée ! Tu peux maintenant féliciter le prospect chaleureusement." }
         } catch (err: any) {
-            return { error: `Erreur interne lors de l'enregistrement : ${err.message}` }
+            console.error('[ERROR] register_inscription exception:', err)
+            return { error: `Erreur interne : ${err.message}` }
         }
     }
 
