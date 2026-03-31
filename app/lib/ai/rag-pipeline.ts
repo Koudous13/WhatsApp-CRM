@@ -157,9 +157,17 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
         
         if (error || !data) return { error: "⚠️ Programme non trouvé dans la base. Demande au prospect de préciser le nom du programme." }
 
+        // Construire la liste avec le label d'affichage ET la clé SQL exacte
+        const champs = (data.programme_champs as any[]).map(f => ({
+            display_name: f.name,                                                // Label à montrer à l'utilisateur (ex: "Date de naissance")
+            sql_key: f.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(),       // Clé JSON à utiliser dans register_inscription (ex: "date_de_naissance")
+            type: f.type,
+            is_required: f.is_required
+        }))
+
         return { 
-            instruction: `Pour inscrire ce prospect à ${data.nom}, tu VAS DEVOIR LUI POSER CES QUESTIONS (une par une ou par petits blocs naturels). NE RIEN INVENTER.`,
-            champs_a_collecter: data.programme_champs
+            instruction: `Pour inscrire ce prospect à ${data.nom}, pose les questions suivantes. IMPORTANT : lors de l'appel à register_inscription, utilise le champ "sql_key" de chaque élément comme clé JSON dans "donnees" (pas le display_name). Pose les questions avec le display_name.`,
+            champs_a_collecter: champs
         }
     }
 
@@ -169,45 +177,8 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
             const safeSlug = slug.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
             const tableName = `inscript_${safeSlug}`
 
-            // 1. Récupérer les champs réels du programme pour le mapping
-            const { data: prog } = await supabase
-                .from('programmes')
-                .select('programme_champs(name)')
-                .eq('slug', slug)
-                .single()
-
-            // Construire un dictionnaire : clé sanitizée -> nom colonne SQL réel
-            const columnMapping: Record<string, string> = {}
-            if (prog?.programme_champs) {
-                for (const champ of prog.programme_champs as any[]) {
-                    const sqlCol = champ.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
-                    // Mapper plusieurs variantes vers la vraie colonne
-                    columnMapping[sqlCol] = sqlCol               // exact
-                    columnMapping[champ.name.toLowerCase()] = sqlCol  // lowercase original
-                    // Variantes anglais/français courants
-                    const aliases: Record<string, string[]> = {
-                        'prenom': ['firstname', 'first_name', 'prénom'],
-                        'nom': ['lastname', 'last_name', 'surname'],
-                        'niveau___tudes': ['educationlevel', 'education_level', 'niveau_etudes', 'level'],
-                        'date_naissance': ['birthdate', 'birth_date', 'dob', 'date_de_naissance'],
-                        'lieu_naissance': ['birthplace', 'birth_place', 'lieu_de_naissance'],
-                        'genre': ['gender', 'sexe', 'sex'],
-                        'motivation': ['motivations', 'reason', 'raison'],
-                        'source': ['comment_connu', 'how_did_you_hear', 'reference'],
-                        'attentes': ['expectations', 'expectation', 'attente'],
-                        'session': ['annee', 'year', 'promotion'],
-                    }
-                    for (const [col, aliasList] of Object.entries(aliases)) {
-                        if (sqlCol.includes(col) || col.includes(sqlCol.replace(/_+/g, ''))) {
-                            for (const alias of aliasList) {
-                                columnMapping[alias] = sqlCol
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Construire l'objet données en mappant les clés de l'IA vers les vraies colonnes
+            // Les clés de args.donnees sont déjà les sql_key exacts retournés par get_programme_requirements
+            // On sanitize par sécurité mais ça devrait déjà être correct
             const insertData: Record<string, any> = {
                 chat_id: from,
                 status: 'pending',
@@ -215,14 +186,12 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
 
             if (args.donnees) {
                 for (const [key, value] of Object.entries(args.donnees)) {
-                    const sanitizedKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
-                    // Chercher la vraie colonne dans le mapping, sinon utiliser la clé sanitizée
-                    const realCol = columnMapping[sanitizedKey] || columnMapping[key.toLowerCase()] || sanitizedKey
-                    insertData[realCol] = value
+                    const safeKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+                    insertData[safeKey] = value
                 }
             }
 
-            // 3. Construire le SQL INSERT pour contourner le cache PostgREST
+            // SQL INSERT direct pour contourner le cache PostgREST
             const allColumns = Object.keys(insertData)
             const columnsSql = allColumns.map(c => `"${c}"`).join(', ')
             const valuesSql = allColumns.map(col => {
