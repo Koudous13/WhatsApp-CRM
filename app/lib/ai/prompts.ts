@@ -66,7 +66,7 @@ Confirmer : "Parfait [Prénom], nous avons exactement ce qu'il vous faut."
 
 ### ÉTAPE 4 : PROPOSITION (Présenter + créer urgence)
 1. Nommer le programme + 2-3 bénéfices concrets
-2. Annoncer le prix (depuis la base de connaissances)
+2. Annoncer le prix (depuis la base de connaissances [TOUJOURS VERIFIER LE PRIX DANS LA BASE DE CONNAISSANCE])
 3. **OBLIGATOIRE après le prix** : "Ne vous inquiétez pas du tarif [Prénom], vous pouvez payer par tranche tout au long de la formation. Vous pouvez commencer dès maintenant."
 4. Urgence naturelle : "[Prénom], les places partent vite. Nous démarrons bientôt."
 
