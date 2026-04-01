@@ -18,6 +18,8 @@ export default function ProgrammesPage() {
     const [activeProgramme, setActiveProgramme] = useState<any>(null)
     const [inscrits, setInscrits] = useState<any[]>([])
     const [loadingInscrits, setLoadingInscrits] = useState(false)
+    const [searchInscrit, setSearchInscrit] = useState('')
+    const [statusFilter, setStatusFilter] = useState('all')
 
     // --- Modal NOUVEAU PROGRAMME ---
     const [showModal, setShowModal] = useState(false)
@@ -276,9 +278,53 @@ export default function ProgrammesPage() {
         if (loadingInscrits) return <div className="p-12 text-center text-slate-400">Chargement des inscrits...</div>
         if (inscrits.length === 0) return <div className="p-12 text-center text-slate-500 glass-card">Aucun inscrit dans ce programme.</div>
 
+        const filteredInscrits = inscrits.filter(ins => {
+            // Filtre par statut
+            if (statusFilter !== 'all' && ins.status !== statusFilter) return false;
+            
+            // Recherche globale: on concatène toutes les valeurs de la ligne
+            if (searchInscrit.trim() !== '') {
+                const searchStr = searchInscrit.toLowerCase();
+                const allValues = Object.values(ins).map(v => String(v).toLowerCase()).join(' ');
+                if (!allValues.includes(searchStr)) return false;
+            }
+            return true;
+        });
+
         return (
-            <div className="w-full overflow-x-auto rounded-xl border border-violet-500/10 shadow-xl bg-black/20 backdrop-blur-md">
-                <table className="w-full text-sm text-left">
+            <div className="space-y-4">
+                {/* Search & Filter Bar */}
+                <div className="flex flex-col md:flex-row gap-4 items-center mb-4">
+                    <div className="flex-1 w-full relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+                        <input 
+                            type="text" 
+                            placeholder="Rechercher par numéro, nom, mail..."
+                            value={searchInscrit}
+                            onChange={(e) => setSearchInscrit(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-[#1a1432] border border-violet-500/20 rounded-lg text-white text-sm focus:ring-1 focus:ring-violet-500 transition shadow-inner"
+                        />
+                    </div>
+                    <div className="w-full md:w-auto flex gap-2">
+                        <select 
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="w-full md:w-48 px-3 py-2 bg-[#1a1432] border border-violet-500/20 rounded-lg text-white text-sm focus:ring-1 focus:ring-violet-500 transition"
+                        >
+                            <option value="all">Tous les statuts</option>
+                            <option value="pending">En attente (pending)</option>
+                            <option value="active">Actif (active)</option>
+                        </select>
+                    </div>
+                </div>
+
+                {filteredInscrits.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 bg-black/20 rounded-xl border border-white/5">
+                        Aucun résultat pour cette recherche.
+                    </div>
+                ) : (
+                    <div className="w-full overflow-x-auto rounded-xl border border-violet-500/10 shadow-xl bg-black/20 backdrop-blur-md">
+                        <table className="w-full text-sm text-left">
                     <thead className="text-xs uppercase bg-[#1a1432]/80 text-violet-300">
                         <tr>
                             <th className="px-6 py-4 font-semibold">Actions</th>
@@ -291,7 +337,7 @@ export default function ProgrammesPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-violet-500/10">
-                        {inscrits.map((inscrit, idx) => (
+                        {filteredInscrits.map((inscrit, idx) => (
                             <tr key={inscrit.id || idx} className="hover:bg-white/5 transition-colors group">
                                 <td className="px-6 py-3 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div className="flex items-center gap-2">
@@ -321,6 +367,8 @@ export default function ProgrammesPage() {
                     </tbody>
                 </table>
             </div>
+            )}
+        </div>
         )
     }
 
