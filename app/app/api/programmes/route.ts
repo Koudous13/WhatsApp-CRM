@@ -105,7 +105,7 @@ export async function POST(req: Request) {
         // 4. Insertion des données initiales depuis le CSV (Importation)
         if (initialData && Array.isArray(initialData) && initialData.length > 0) {
             console.log(`[DEBUG] Importation initiale pour ${tableName} : ${initialData.length} lignes reçues.`);
-            
+
             // Création d'un dictionnaire de mapping : Nom Original -> Nom SQL
             const headerMapping: Record<string, string> = {}
             if (fields && Array.isArray(fields)) {
@@ -124,16 +124,16 @@ export async function POST(req: Request) {
                     newRow[sqlKey] = row[originalKey]
                 })
 
-                const phoneKeys = Object.keys(newRow).filter(k => 
+                const phoneKeys = Object.keys(newRow).filter(k =>
                     k.includes('phone') || k.includes('t_l_phone') || k.includes('tel') || k === 'numero' || k === 'chat_id' || k === 'whatsapp'
                 );
-                
+
                 if (!newRow.chat_id) {
-                    newRow.chat_id = phoneKeys.length > 0 && newRow[phoneKeys[0]] 
-                        ? String(newRow[phoneKeys[0]]).replace(/\D/g, '') 
+                    newRow.chat_id = phoneKeys.length > 0 && newRow[phoneKeys[0]]
+                        ? String(newRow[phoneKeys[0]]).replace(/\D/g, '')
                         : crypto.randomUUID();
                 } else {
-                     newRow.chat_id = String(newRow.chat_id).replace(/\D/g, '')
+                    newRow.chat_id = String(newRow.chat_id).replace(/\D/g, '')
                 }
                 return newRow
             });
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
             // La méthode la plus sûre sans dépendre du type est de construire la requête VALUES.
             const allColumns = Array.from(new Set(rowsToInsert.flatMap(r => Object.keys(r))));
             const columnsSql = allColumns.map(c => `"${c}"`).join(', ');
-            
+
             const valuesSql = rowsToInsert.map(row => {
                 const vals = allColumns.map(col => {
                     const val = row[col];
@@ -165,25 +165,77 @@ export async function POST(req: Request) {
 
             if (insertError) {
                 console.error("[ERROR] Erreur lors de l'insertion SQL direct (initialData):", insertError)
-                return NextResponse.json({ 
-                    success: true, 
-                    programme: progData, 
-                    tableName, 
+                return NextResponse.json({
+                    success: true,
+                    programme: progData,
+                    tableName,
                     debugInfo: {
                         rowCount: rowsToInsert.length,
                         error: insertError,
                         sql: bulkInsertSql.substring(0, 500) + "..."
                     },
-                    warning: "SQL Data import failed: " + insertError.message 
+                    warning: "SQL Data import failed: " + insertError.message
                 })
             }
-            
+
             console.log(`[DEBUG] Insertion SQL direct réussie pour ${tableName}.`);
-            return NextResponse.json({ 
-                success: true, 
-                programme: progData, 
-                tableName, 
-                importedCount: rowsToInsert.length 
+
+            // --- 5. Synchronisation avec Profil_Prospects ---
+            try {
+                const prenomKeys = ['prenom', 'prénom', 'first_name', 'firstname', 'given_name'];
+                const nomKeys = ['nom', 'last_name', 'lastname', 'family_name', 'name', 'nom_complet'];
+
+                const profilesToUpsert = rowsToInsert.map(row => {
+                    let prenom = null;
+                    let nom = null;
+
+                    for (const key of Object.keys(row)) {
+                        const lowerKey = key.toLowerCase();
+                        if (!prenom && prenomKeys.some(k => lowerKey.includes(k))) {
+                            prenom = row[key];
+                        } else if (!nom && nomKeys.some(k => lowerKey.includes(k))) {
+                            nom = row[key];
+                        }
+                    }
+
+                    if (!prenom && nom && String(nom).includes(' ')) {
+                        const parts = String(nom).trim().split(' ');
+                        prenom = parts[0];
+                        nom = parts.slice(1).join(' ');
+                    }
+
+                    return {
+                        chat_id: row.chat_id,
+                        prenom: prenom ? String(prenom).trim().substring(0, 50) : null,
+                        nom: nom ? String(nom).trim().substring(0, 50) : null,
+                        profil_type: 'Inscrit',
+                        programme_recommande: progData.nom,
+                        statut_conversation: 'Inscription',
+                        score_engagement: 80,
+                        opt_in: true,
+                        nombre_interactions: 1,
+                        date_derniere_activite: new Date().toISOString()
+                    };
+                });
+
+                const { error: syncError } = await supabase
+                    .from('Profil_Prospects')
+                    .upsert(profilesToUpsert, { onConflict: 'chat_id', ignoreDuplicates: true });
+
+                if (syncError) {
+                    console.error("[ERROR] Erreur de synchronisation Profil_Prospects (InitialData):", syncError);
+                } else {
+                    console.log(`[DEBUG] Sync Profil_Prospects réussie : ${profilesToUpsert.length} contacts mis à jour.`);
+                }
+            } catch (syncErr) {
+                console.error("[ERROR] Exception lors de la synchronisation (InitialData):", syncErr);
+            }
+
+            return NextResponse.json({
+                success: true,
+                programme: progData,
+                tableName,
+                importedCount: rowsToInsert.length
             })
         }
 

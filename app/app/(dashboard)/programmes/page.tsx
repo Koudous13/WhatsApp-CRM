@@ -466,6 +466,11 @@ export default function ProgrammesPage() {
                                     onChange={handleFileUpload}
                                     className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-500/20 file:text-violet-300 hover:file:bg-violet-500/30 transition-all cursor-pointer"
                                 />
+                                
+                                <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-200">
+                                    💡 <strong>Astuce CRM :</strong> Pour que les inscrits apparaissent sous leur vrai nom dans la page Contacts, nommez vos colonnes <code className="bg-blue-500/20 px-1 py-0.5 rounded text-blue-300 font-mono">prenom</code> et <code className="bg-blue-500/20 px-1 py-0.5 rounded text-blue-300 font-mono">nom</code>. Le numéro de téléphone (obligatoire) peut s'appeler <code className="bg-blue-500/20 px-1 py-0.5 rounded text-blue-300 font-mono">chat_id</code> ou <code className="bg-blue-500/20 px-1 py-0.5 rounded text-blue-300 font-mono">telephone</code>.
+                                </div>
+
                                 {initialCsvData.length > 0 && (
                                     <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-3">
                                         <span className="text-2xl">✅</span>
