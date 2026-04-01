@@ -19,7 +19,22 @@ export async function GET() {
 
         if (error) throw error
 
-        return NextResponse.json(data)
+        // 2. Enrichir avec le nombre exact d'inscrits en lisant chaque table
+        const augmentedData = await Promise.all(
+            data.map(async (prog) => {
+                const tableName = `inscript_${prog.slug.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()}`;
+                const { count, error: countErr } = await supabase
+                    .from(tableName as any)
+                    .select('*', { count: 'exact', head: true });
+
+                return {
+                    ...prog,
+                    inscritsCount: countErr ? 0 : (count || 0)
+                };
+            })
+        );
+
+        return NextResponse.json(augmentedData)
     } catch (e: any) {
         console.error("Erreur GET /api/programmes:", e)
         return NextResponse.json({ error: e.message }, { status: 500 })

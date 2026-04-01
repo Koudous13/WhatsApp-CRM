@@ -394,9 +394,15 @@ export default function ProgrammesPage() {
                                         <div className="flex justify-between items-start mb-4 relative z-10">
                                             <div>
                                                 <h3 className="text-xl font-bold text-white mb-1 group-hover:text-violet-300 transition-colors">{p.nom}</h3>
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-violet-500/10 text-violet-300 border border-violet-500/20">
-                                                    inscript_{p.slug}
-                                                </span>
+                                                <div className="flex gap-2 items-center mt-2">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                                                        inscript_{p.slug}
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-white/5 text-white border border-white/10">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                                        {p.inscritsCount !== undefined ? `${p.inscritsCount} inscrit${p.inscritsCount > 1 ? 's' : ''}` : 'Chargement...'}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
                                                 <button 
