@@ -8,6 +8,7 @@ interface FieldInfo {
     type: string;
     is_required: boolean;
     question_label?: string;
+    options?: string;
 }
 
 export default function ProgrammesPage() {
@@ -589,6 +590,15 @@ export default function ProgrammesPage() {
                                                         const nf = [...fields]; nf[i].question_label = e.target.value; setFields(nf);
                                                     }}
                                                     className="w-full px-3 py-1.5 bg-black/40 border border-emerald-500/20 rounded text-xs text-emerald-300 placeholder-slate-600 focus:ring-1 focus:ring-emerald-500"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Options de réponse (pour sondage, séparées par virgule) — ex: Masculin, Féminin, Autre"
+                                                    value={f.options || ''}
+                                                    onChange={e => {
+                                                        const nf = [...fields]; nf[i].options = e.target.value; setFields(nf);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 bg-black/40 border border-amber-500/20 rounded text-xs text-amber-300 placeholder-slate-600 focus:ring-1 focus:ring-amber-500"
                                                 />
                                             </div>
                                         ))}
