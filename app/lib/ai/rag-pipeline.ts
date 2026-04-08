@@ -172,7 +172,7 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
         // 1. Charger les champs du programme (avec question_label)
         const { data, error } = await supabase
             .from('programmes')
-            .select(`nom, slug, programme_champs(name, type, is_required, question_label, display_order)`)
+            .select(`nom, slug, programme_champs(name, type, is_required, question_label, options, display_order)`)
             .eq('slug', args.programme_slug.toLowerCase())
             .single()
         
@@ -226,6 +226,7 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
                 question_label: f.question_label || null, // Formulation exacte définie par l'admin
                 sql_key,
                 type: f.type,
+                options: f.options ? f.options.split(',').map((o: string) => o.trim()).filter((o: string) => o.length > 0) : undefined,
                 is_required: f.is_required
             })
         }
