@@ -31,6 +31,14 @@ export async function sendWhatsAppReaction(to: string, messageId: string, emoji:
     return wasenderFetch('/send-reaction', { to, messageId, emoji })
 }
 
+/** Envoie un poll (sondage) WhatsApp natif à un numéro */
+export async function sendWhatsAppPoll(to: string, question: string, options: string[], multiSelect: boolean = false) {
+    return wasenderFetch('/send-message', {
+        to,
+        poll: { question, options, multiSelect }
+    })
+}
+
 /** Vérifie le statut de la session WhatsApp */
 export async function getSessionStatus() {
     const res = await fetch(`${BASE_URL}/session-status`, {

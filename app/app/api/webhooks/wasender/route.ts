@@ -56,6 +56,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
     }
 
+    // ─── Gestion des votes de poll ───────────────────────────────────────
+    if (event === 'poll.results') {
+        waitUntil(handlePollResult(data))
+        return NextResponse.json({ ok: true })
+    }
+
     if (event !== 'messages.upsert' && event !== 'messages.received') {
         return NextResponse.json({ ok: true }) // Ignorer les autres events
     }
@@ -208,4 +214,59 @@ async function handleDeliveryUpdate(data: any) {
                 .eq('wasender_message_id', messageId)
         }
     }
+}
+
+/**
+ * Gère les résultats de poll (event poll.results).
+ * Identifie le choix du votant, l'injecte comme message texte dans la table messages,
+ * puis déclenche le pipeline IA normalement pour qu'il traite la réponse.
+ */
+async function handlePollResult(data: any) {
+    const supabase = createAdminClient()
+
+    // Identifier le votant depuis les voters de chaque option
+    const pollResult: Array<{ name: string; voters: string[] }> = data?.pollResult ?? []
+    
+    // Trouver les options choisies (voters non vides)
+    const chosenOptions = pollResult
+        .filter(opt => opt.voters && opt.voters.length > 0)
+        .map(opt => opt.name)
+
+    if (chosenOptions.length === 0) return // Pas de vote encore
+
+    // Extraire le numéro du votant (ex: "229...@s.whatsapp.net")
+    const firstVoterJid = pollResult.flatMap(o => o.voters)[0] ?? ''
+    const from = firstVoterJid.replace('@s.whatsapp.net', '').replace('@lid', '')
+
+    if (!from) return
+
+    // Texte synthétique représentant le choix
+    const voteText = chosenOptions.join(', ')
+
+    console.log(`[Poll] Vote reçu de ${from}: ${voteText}`)
+
+    // Trouver la conversation active
+    const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id, status')
+        .eq('contact_chat_id', from)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+    if (!existingConv || existingConv.status !== 'ai_active') return
+
+    // Injecter le vote comme message inbound dans la table messages
+    await supabase.from('messages').insert({
+        conversation_id: existingConv.id,
+        contact_chat_id: from,
+        direction: 'inbound',
+        message_type: 'text',
+        body: voteText,
+        delivery_status: 'delivered',
+        timestamp: new Date().toISOString(),
+    })
+
+    // Déclencher le pipeline IA avec la réponse du poll
+    await triggerAIResponse({ from, text: voteText, conversationId: existingConv.id })
 }

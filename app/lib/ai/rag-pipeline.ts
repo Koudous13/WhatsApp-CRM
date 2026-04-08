@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendWhatsAppMessage } from '@/lib/wasender/client'
+import { sendWhatsAppMessage, sendWhatsAppPoll } from '@/lib/wasender/client'
 import { sendTelegramAlert, buildLeadChaudAlert } from '@/lib/notifications/telegram'
 import { BLOLAB_SYSTEM_PROMPT } from '@/lib/ai/prompts'
 
@@ -101,6 +101,26 @@ const tools: any = [
                     }
                 },
                 required: ["programme_slug", "donnees"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "send_poll_message",
+            description: "OBLIGATOIRE pour toute question à choix multiples ou à choix unique. Envoie un vrai sondage WhatsApp natif. À utiliser systématiquement quand un champ a des options définies.",
+            parameters: {
+                type: "object",
+                properties: {
+                    question: { type: "string", description: "La question à poser" },
+                    options: { 
+                        type: "array", 
+                        items: { type: "string" },
+                        description: "La liste des choix possibles" 
+                    },
+                    multi_select: { type: "boolean", description: "true si plusieurs réponses sont possibles, false (choix unique) par défaut" }
+                },
+                required: ["question", "options"]
             }
         }
     }
@@ -304,6 +324,24 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
         } catch (err: any) {
             console.error('[ERROR] register_inscription exception:', err)
             return { error: `Erreur interne : ${err.message}` }
+        }
+    }
+
+    if (name === 'send_poll_message') {
+        try {
+            await sendWhatsAppPoll(
+                from,
+                args.question,
+                args.options,
+                args.multi_select ?? false
+            )
+            return { result: `Poll envoyé avec succès. Attends la réponse de l'utilisateur — elle arrivera comme un message texte dans la conversation. NE réponds PAS encore, laisse l'utilisateur voter.` }
+        } catch (err: any) {
+            console.error('[ERROR] send_poll_message:', err)
+            // Fallback : si le poll échoue, on envoie un texte avec les options
+            const optionsText = (args.options as string[]).map((o: string, i: number) => `${i + 1}. ${o}`).join('\n')
+            await sendWhatsAppMessage(from, `${args.question}\n\n${optionsText}`)
+            return { result: 'Poll indisponible, options envoyées en texte.' }
         }
     }
 
