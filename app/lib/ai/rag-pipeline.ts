@@ -177,21 +177,47 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
             const safeSlug = slug.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
             const tableName = `inscript_${safeSlug}`
 
-            // Les clés de args.donnees sont déjà les sql_key exacts retournés par get_programme_requirements
-            // On sanitize par sécurité mais ça devrait déjà être correct
-            const insertData: Record<string, any> = {
+            // --- NIVEAU 1 : Récupérer les vraies colonnes de la table depuis information_schema ---
+            // Cela permet de filtrer les clés inventées ou mal mappées par l'IA
+            const columnCheckSql = `SELECT column_name FROM information_schema.columns WHERE table_name = '${tableName}' AND table_schema = 'public';`
+            const { data: colData, error: colError } = await supabase.rpc('admin_execute_sql', { sql_query: columnCheckSql })
+            
+            const validColumns: Set<string> = new Set(['chat_id', 'status', 'id', 'created_at'])
+            if (!colError && colData) {
+                // admin_execute_sql retourne un tableau de lignes
+                const rows = Array.isArray(colData) ? colData : JSON.parse(colData)
+                rows.forEach((r: any) => {
+                    const colName = r.column_name || r['column_name']
+                    if (colName) validColumns.add(colName)
+                })
+            }
+            console.log(`[DEBUG] Colonnes valides pour ${tableName}:`, [...validColumns])
+
+            // --- Construction de insertData avec sanitisation ---
+            const rawData: Record<string, any> = {
                 chat_id: from,
                 status: 'pending',
             }
-
             if (args.donnees) {
                 for (const [key, value] of Object.entries(args.donnees)) {
                     const safeKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
-                    insertData[safeKey] = value
+                    rawData[safeKey] = value
                 }
             }
 
-            // SQL INSERT direct pour contourner le cache PostgREST
+            // --- NIVEAU 1 : Filtrer : ne garder que les colonnes qui existent réellement ---
+            // Si information_schema a retourné des colonnes, on filtre. Sinon on insère tout (fallback).
+            const insertData: Record<string, any> = validColumns.size > 4
+                ? Object.fromEntries(Object.entries(rawData).filter(([k]) => validColumns.has(k)))
+                : rawData
+
+            // Colonnes ignorées (inventées par l'IA)
+            const ignoredKeys = Object.keys(rawData).filter(k => !validColumns.has(k) && k !== 'chat_id' && k !== 'status')
+            if (ignoredKeys.length > 0) {
+                console.warn(`[WARN] register_inscription: colonnes ignorées car inexistantes dans ${tableName}:`, ignoredKeys)
+            }
+
+            // --- SQL INSERT direct pour contourner le cache PostgREST ---
             const allColumns = Object.keys(insertData)
             const columnsSql = allColumns.map(c => `"${c}"`).join(', ')
             const valuesSql = allColumns.map(col => {
@@ -217,7 +243,7 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
             if (sqlError) {
                 console.error('[ERROR] register_inscription SQL failed:', sqlError, 'Data:', insertData)
                 await sendTelegramAlert(
-                    `⚠️ ALERTE INSCRIPTION ${slug.toUpperCase()} - Problème technique\n\nProspect: ${insertData.prenom || ''} ${insertData.nom || ''}\nTéléphone: ${from}\nEmail: ${insertData.email || 'N/A'}\n\nErreur: "${sqlError.message}"\n\nDonnées fournies:\n${Object.entries(insertData).filter(([k]) => !['chat_id','status'].includes(k)).map(([k,v]) => `- ${k}: ${v}`).join('\n')}`
+                    `⚠️ ALERTE INSCRIPTION ${slug.toUpperCase()} - Problème technique\n\nProspect: ${insertData.prenom || insertData.nom || ''}\nTéléphone: ${from}\nEmail: ${insertData.email || 'N/A'}\n\nErreur: "${sqlError.message}"\n\nDonnées fournies:\n${Object.entries(insertData).filter(([k]) => !['chat_id','status'].includes(k)).map(([k,v]) => `- ${k}: ${v}`).join('\n')}`
                 )
                 return { error: `Erreur lors de l'enregistrement : ${sqlError.message}. L'équipe a été alertée.` }
             }
