@@ -149,25 +149,76 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
     }
 
     if (name === 'get_programme_requirements') {
+        // 1. Charger les champs du programme (avec question_label)
         const { data, error } = await supabase
             .from('programmes')
-            .select(`nom, slug, programme_champs(name, type, is_required)`)
+            .select(`nom, slug, programme_champs(name, type, is_required, question_label, display_order)`)
             .eq('slug', args.programme_slug.toLowerCase())
             .single()
         
         if (error || !data) return { error: "⚠️ Programme non trouvé dans la base. Demande au prospect de préciser le nom du programme." }
 
-        // Construire la liste avec le label d'affichage ET la clé SQL exacte
-        const champs = (data.programme_champs as any[]).map(f => ({
-            display_name: f.name,                                                // Label à montrer à l'utilisateur (ex: "Date de naissance")
-            sql_key: f.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(),       // Clé JSON à utiliser dans register_inscription (ex: "date_de_naissance")
-            type: f.type,
-            is_required: f.is_required
-        }))
+        // 2. Charger le profil connu du prospect
+        const { data: profile } = await supabase
+            .from('Profil_Prospects')
+            .select('prenom, nom')
+            .eq('chat_id', from)
+            .single()
+
+        const knownPrenom = profile?.prenom || null
+        const knownNom = profile?.nom || null
+
+        // 3. Patterns pour détecter les champs à auto-remplir
+        const phonePatterns = ['tel', 'phone', 'numero', 'whatsapp', 'chat_id', 'contact', 'portable', 'mobile']
+        const prenomPatterns = ['prenom', 'prénom', 'first_name', 'firstname', 'given_name']
+        const nomPatterns = ['nom', 'last_name', 'lastname', 'surname', 'family_name']
+
+        const already_known: Record<string, any> = {}
+        const champsToAsk: any[] = []
+
+        const sortedChamps = (data.programme_champs as any[])
+            .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+
+        for (const f of sortedChamps) {
+            const sql_key = f.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+            const lowerKey = sql_key.toLowerCase()
+
+            // Auto-remplir champs téléphone avec le numéro WhatsApp
+            if (phonePatterns.some(p => lowerKey.includes(p))) {
+                already_known[sql_key] = from
+                continue
+            }
+
+            // Auto-remplir prénom si connu
+            if (prenomPatterns.some(p => lowerKey.includes(p)) && knownPrenom) {
+                already_known[sql_key] = knownPrenom
+                continue
+            }
+
+            // Auto-remplir nom si connu
+            if (nomPatterns.some(p => lowerKey.includes(p)) && knownNom) {
+                already_known[sql_key] = knownNom
+                continue
+            }
+
+            champsToAsk.push({
+                display_name: f.name,
+                question_label: f.question_label || null, // Formulation exacte définie par l'admin
+                sql_key,
+                type: f.type,
+                is_required: f.is_required
+            })
+        }
+
+        const autofillInfo = Object.keys(already_known).length > 0
+            ? `Les données suivantes sont déjà connues et seront auto-remplies (NE PAS poser ces questions) : ${JSON.stringify(already_known)}`
+            : 'Aucune donnée pré-remplie.'
 
         return { 
-            instruction: `Pour inscrire ce prospect à ${data.nom}, pose les questions suivantes. IMPORTANT : lors de l'appel à register_inscription, utilise le champ "sql_key" de chaque élément comme clé JSON dans "donnees" (pas le display_name). Pose les questions avec le display_name.`,
-            champs_a_collecter: champs
+            instruction: `Pour inscrire ce prospect à ${data.nom}, pose les ${champsToAsk.length} questions de "champs_a_collecter" UNE PAR UNE. Attends la réponse avant de poser la suivante. ${autofillInfo}. Pour chaque champ : si "question_label" est renseigné, utilise-le tel quel ; sinon reformule "display_name" naturellement. Dans register_inscription, utilise le "sql_key" EXACT comme clé JSON, et inclus aussi les données de "already_known" dans "donnees".`,
+            champs_a_collecter: champsToAsk,
+            already_known,
+            nombre_questions: champsToAsk.length
         }
     }
 
@@ -277,7 +328,7 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         .eq('conversation_id', conversationId)
         .eq('message_type', 'text')
         .order('timestamp', { ascending: false })
-        .limit(10)
+        .limit(30)
 
     let historyFormatted: any[] = (history ?? [])
         .reverse()

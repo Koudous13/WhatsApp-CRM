@@ -7,6 +7,7 @@ interface FieldInfo {
     name: string;
     type: string;
     is_required: boolean;
+    question_label?: string;
 }
 
 export default function ProgrammesPage() {
@@ -549,35 +550,46 @@ export default function ProgrammesPage() {
                                     <div className="p-6 text-center border border-dashed border-slate-700 bg-slate-800/20 rounded-xl">
                                         <p className="text-sm text-slate-400">Aucune colonne définie.</p>
                                         <p className="text-xs text-slate-500 mt-1">L'IA ne demandera aucune info, et la table sera vide (sauf contact de base).</p>
-                                        <button type="button" onClick={() => setFields([{ name: 'Prénom', type: 'text', is_required: false }, { name: 'Nom', type: 'text', is_required: false }, { name: 'Téléphone', type: 'text', is_required: false }])} className="mt-3 text-xs text-violet-400 hover:text-violet-300 underline">Ajouter les colonnes standards</button>
+                                        <button type="button" onClick={() => setFields([{ name: 'Prénom', type: 'text', is_required: false, question_label: '' }, { name: 'Nom', type: 'text', is_required: false, question_label: '' }, { name: 'Téléphone', type: 'text', is_required: false, question_label: '' }])} className="mt-3 text-xs text-violet-400 hover:text-violet-300 underline">Ajouter les colonnes standards</button>
                                     </div>
                                 ) : (
                                     <div className="space-y-2 bg-black/20 p-2 rounded-xl border border-white/5 max-h-48 overflow-y-auto">
                                         {fields.map((f, i) => (
-                                            <div key={i} className="flex gap-2 items-center animate-fadeIn bg-slate-900/50 p-2 rounded-lg border border-white/5">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Nom (ex: Ville)" 
-                                                    value={f.name}
+                                            <div key={i} className="flex flex-col gap-2 animate-fadeIn bg-slate-900/50 p-3 rounded-lg border border-white/5">
+                                                <div className="flex gap-2 items-center">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Nom de colonne (ex: Ville)" 
+                                                        value={f.name}
+                                                        onChange={e => {
+                                                            const nf = [...fields]; nf[i].name = e.target.value; setFields(nf);
+                                                        }}
+                                                        required
+                                                        className="flex-1 px-3 py-1.5 bg-black/40 border border-slate-700/50 rounded text-sm text-white focus:ring-1 focus:ring-violet-500"
+                                                    />
+                                                    <select 
+                                                        value={f.type}
+                                                        onChange={e => {
+                                                            const nf = [...fields]; nf[i].type = e.target.value; setFields(nf);
+                                                        }}
+                                                        className="w-28 px-3 py-1.5 bg-black/40 border border-slate-700/50 rounded text-xs text-slate-300 focus:ring-1 focus:ring-violet-500"
+                                                    >
+                                                        <option value="text">Texte</option>
+                                                        <option value="number">Nombre</option>
+                                                    </select>
+                                                    <button type="button" onClick={() => setFields(fields.filter((_, idx) => idx !== i))} className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition">
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Question WhatsApp (optionnel) — ex: Dans quelle ville habitez-vous ?"
+                                                    value={f.question_label || ''}
                                                     onChange={e => {
-                                                        const nf = [...fields]; nf[i].name = e.target.value; setFields(nf);
+                                                        const nf = [...fields]; nf[i].question_label = e.target.value; setFields(nf);
                                                     }}
-                                                    required
-                                                    className="flex-1 px-3 py-1.5 bg-black/40 border border-slate-700/50 rounded text-sm text-white focus:ring-1 focus:ring-violet-500"
+                                                    className="w-full px-3 py-1.5 bg-black/40 border border-emerald-500/20 rounded text-xs text-emerald-300 placeholder-slate-600 focus:ring-1 focus:ring-emerald-500"
                                                 />
-                                                <select 
-                                                    value={f.type}
-                                                    onChange={e => {
-                                                        const nf = [...fields]; nf[i].type = e.target.value; setFields(nf);
-                                                    }}
-                                                    className="w-28 px-3 py-1.5 bg-black/40 border border-slate-700/50 rounded text-xs text-slate-300 focus:ring-1 focus:ring-violet-500"
-                                                >
-                                                    <option value="text">Texte</option>
-                                                    <option value="number">Nombre</option>
-                                                </select>
-                                                <button type="button" onClick={() => setFields(fields.filter((_, idx) => idx !== i))} className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition">
-                                                    🗑️
-                                                </button>
                                             </div>
                                         ))}
                                     </div>

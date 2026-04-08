@@ -77,7 +77,8 @@ export async function POST(req: Request) {
                 type: f.type || 'text',
                 options: f.options || null,
                 is_required: f.is_required !== false,
-                display_order: idx + 1
+                display_order: idx + 1,
+                question_label: f.question_label || null
             }))
 
             ddlColumns = fields.map((f: any) => {
