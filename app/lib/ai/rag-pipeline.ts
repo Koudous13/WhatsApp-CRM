@@ -1,8 +1,9 @@
 import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage, sendWhatsAppPoll } from '@/lib/wasender/client'
-import { sendTelegramAlert, buildLeadChaudAlert } from '@/lib/notifications/telegram'
+import { sendTelegramAlert, buildLeadChaudAlert, buildHandoverAlert } from '@/lib/notifications/telegram'
 import { BLOLAB_SYSTEM_PROMPT } from '@/lib/ai/prompts'
+import { enrichContext, formatProspectStateForPrompt } from '@/lib/ai/context-enricher'
 
 const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',
@@ -95,12 +96,36 @@ const tools: any = [
                 type: "object",
                 properties: {
                     programme_slug: { type: "string", description: "Le slug du programme" },
-                    donnees: { 
-                        type: "object", 
-                        description: "Objet clé-valeur JSON contenant exactement les réponses du prospect pour les champs demandés (ex: {\"prenom\": \"Paul\", \"parcours\": \"Web\"})" 
+                    donnees: {
+                        type: "object",
+                        description: "Objet clé-valeur JSON contenant exactement les réponses du prospect pour les champs demandés (ex: {\"prenom\": \"Paul\", \"parcours\": \"Web\"})"
                     }
                 },
                 required: ["programme_slug", "donnees"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "check_inscription_status",
+            description: "Vérifie si le prospect a déjà une inscription en base (tous programmes confondus). À appeler quand le prospect évoque une inscription déjà faite ailleurs (paiement offline, orientation par un agent) ou quand il se présente comme un élève déjà inscrit. Retourne la liste complète de ses inscriptions avec leurs détails.",
+            parameters: { type: "object", properties: {}, required: [] }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "handover_humain",
+            description: "Transfère la conversation à un conseiller humain. Alerte l'équipe via Telegram et passe la conversation en statut 'escalated' (l'IA ne répondra plus). À appeler : (1) sur demande explicite du prospect, (2) pour valider un paiement offline, (3) quand l'info n'est pas dans la base de connaissances, (4) en cas de réclamation. NE PAS utiliser pour des questions que tu peux traiter toi-même.",
+            parameters: {
+                type: "object",
+                properties: {
+                    raison: { type: "string", description: "Raison courte (ex: 'validation paiement offline', 'demande explicite', 'réclamation', 'info non trouvée')" },
+                    urgence: { type: "string", enum: ["normal", "urgent"], description: "Niveau d'urgence" },
+                    contexte: { type: "string", description: "Détails utiles pour le conseiller (ex: programme concerné, résumé de la demande)" }
+                },
+                required: ["raison"]
             }
         }
     }
@@ -308,7 +333,90 @@ async function executeToolCall(supabase: any, from: string, name: string, args: 
         }
     }
 
+    if (name === 'check_inscription_status') {
+        try {
+            // Lister les tables d'inscription existantes
+            const { data: tablesData } = await supabase.rpc('admin_execute_sql', {
+                sql_query: `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'inscript\\_%' ESCAPE '\\'`
+            })
+            const tables: string[] = (Array.isArray(tablesData) ? tablesData : [])
+                .map((r: any) => r.table_name || r['table_name'])
+                .filter(Boolean)
 
+            if (tables.length === 0) return { result: 'Aucune inscription trouvée.', inscriptions: [] }
+
+            const safeChat = from.replace(/'/g, "''")
+            const inscriptions: any[] = []
+
+            // Récupérer les données complètes de chaque table pour ce chat_id
+            for (const t of tables) {
+                const safeTable = t.replace(/[^a-zA-Z0-9_]/g, '')
+                const slug = safeTable.replace(/^inscript_/, '')
+                const { data: rows } = await supabase.rpc('admin_execute_sql', {
+                    sql_query: `SELECT * FROM "${safeTable}" WHERE chat_id = '${safeChat}'`
+                })
+                if (Array.isArray(rows) && rows.length > 0) {
+                    for (const row of rows) {
+                        const { chat_id, ...details } = row
+                        inscriptions.push({ programme_slug: slug, ...details })
+                    }
+                }
+            }
+
+            if (inscriptions.length === 0) {
+                return { result: "Aucune inscription trouvée pour ce numéro dans la base.", inscriptions: [] }
+            }
+
+            return {
+                result: `${inscriptions.length} inscription(s) trouvée(s).`,
+                inscriptions
+            }
+        } catch (err: any) {
+            console.error('[ERROR] check_inscription_status:', err)
+            return { error: `Erreur lors de la vérification: ${err.message}` }
+        }
+    }
+
+    if (name === 'handover_humain') {
+        try {
+            // Récupérer le profil pour enrichir l'alerte
+            const { data: profil } = await supabase
+                .from('Profil_Prospects')
+                .select('prenom, programme_recommande')
+                .eq('chat_id', from)
+                .maybeSingle()
+
+            // Passer la conversation en escalated pour que l'IA cesse de répondre
+            const { data: conv } = await supabase
+                .from('conversations')
+                .select('id')
+                .eq('contact_chat_id', from)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+            if (conv?.id) {
+                await supabase
+                    .from('conversations')
+                    .update({ status: 'escalated' })
+                    .eq('id', conv.id)
+            }
+
+            await sendTelegramAlert(buildHandoverAlert({
+                raison: args.raison || 'non précisée',
+                urgence: args.urgence === 'urgent' ? 'urgent' : 'normal',
+                prenom: profil?.prenom ?? null,
+                chat_id: from,
+                contexte: args.contexte,
+                programme: profil?.programme_recommande ?? null,
+            }))
+
+            return { result: "Équipe alertée, conversation transférée à un conseiller humain. Tu peux confirmer au prospect qu'un membre de l'équipe revient vers lui rapidement — puis arrête-toi là, ne pose plus de question." }
+        } catch (err: any) {
+            console.error('[ERROR] handover_humain:', err)
+            return { error: `Erreur lors du handover: ${err.message}` }
+        }
+    }
 
     return { error: 'Unknown tool' }
 }
@@ -346,7 +454,7 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
     }
 
     // --- [2] CONTEXTE PROFIL ---------------------------------------
-    const { data: contact } = await supabase.from('Profil_Prospects').select('*').eq('chat_id', from).single()
+    const { data: contact } = await supabase.from('Profil_Prospects').select('*').eq('chat_id', from).maybeSingle()
     const promptContact = contact ? `\n## CRM Actuel de "${from}":\n` + JSON.stringify(contact, null, 2) : ''
 
     // --- [2.5] RECUPERATION DYNAMIQUE DES PROGRAMMES ---------------
@@ -355,8 +463,15 @@ export async function triggerAIResponse(input: RAGInput): Promise<void> {
         ? `\n## 📝 RÈGLE CRITIQUE — MAPPING DES SLUGS (PROGRAMMES ACTIFS)\nVoici la liste dynamique des programmes actuellement ouverts et leurs slugs respectifs.\nQuand tu appelles \`get_programme_requirements\` ou \`register_inscription\`, tu dois TOUJOURS utiliser l'un de ces slugs EXACTS en fonction du choix du prospect :\n` + activeProgrammes.map(p => `- S'il veut faire "${p.nom}" → utilise le slug : "${p.slug}"`).join('\n')
         : '\n## 📝 PROGRAMMES : Aucun programme actif trouvé en base.'
 
-    // On utilise le prompt statique et on y accole les données fraîches
-    const fullSystemPrompt = BLOLAB_SYSTEM_PROMPT + promptProgrammes + promptContact
+    // --- [2.7] ÉTAT PROSPECT (Context Enricher) --------------------
+    // Calcul déterministe de la route + injection d'un bloc fiable dans le prompt.
+    const prospectState = await enrichContext(from, text, supabase)
+    const promptProspectState = formatProspectStateForPrompt(prospectState)
+
+    console.log(`[RAG] ${from} route=${prospectState.suggested_route} prenom=${prospectState.known_prenom} signals=${prospectState.intent_keywords.join(',') || 'none'}`)
+
+    // On utilise le prompt statique et on y accole les données fraîches + état prospect
+    const fullSystemPrompt = BLOLAB_SYSTEM_PROMPT + promptProgrammes + promptContact + promptProspectState
 
     // --- [3] BOUCLE D'AGENT DEEPSEEK --------------------------------
     let aiResponse = ''

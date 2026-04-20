@@ -164,8 +164,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
     }
 
-    // Si conversation déjà prise en charge par un humain → ignorer l'IA
-    if (conversationStatus === 'assigned' || conversationStatus === 'resolved') {
+    // Si conversation déjà prise en charge par un humain ou escaladée → ignorer l'IA
+    if (conversationStatus === 'assigned' || conversationStatus === 'resolved' || conversationStatus === 'escalated') {
         return NextResponse.json({ ok: true })
     }
 

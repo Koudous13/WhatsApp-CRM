@@ -23,6 +23,33 @@ export async function sendTelegramAlert(message: string): Promise<void> {
     }
 }
 
+/** Formatte l'alerte handover humain (escalade) */
+export function buildHandoverAlert(params: {
+    raison: string
+    urgence?: 'normal' | 'urgent'
+    prenom?: string | null
+    chat_id: string
+    contexte?: string
+    programme?: string | null
+}) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://whatsapp-crm-blolabparakou.vercel.app'
+    const inboxUrl = `${appUrl}/inbox?chat_id=${params.chat_id}`
+    const prefix = params.urgence === 'urgent' ? '🚨 *URGENT — HANDOVER HUMAIN*' : '🙋 *Handover humain demandé*'
+
+    const lines = [
+        prefix,
+        '',
+        `📌 *Raison:* ${params.raison}`,
+    ]
+    if (params.prenom) lines.push(`👤 *Prénom:* ${params.prenom}`)
+    if (params.programme) lines.push(`🎯 *Programme:* ${params.programme}`)
+    lines.push(`📱 *WhatsApp:* ${params.chat_id}`)
+    if (params.contexte) lines.push(`📝 *Contexte:* ${params.contexte}`)
+    lines.push('', `👉 [Ouvrir la conversation Inbox](${inboxUrl})`)
+
+    return lines.join('\n')
+}
+
 /** Formatte l'alerte lead chaud */
 export function buildLeadChaudAlert(params: {
     prenom?: string
