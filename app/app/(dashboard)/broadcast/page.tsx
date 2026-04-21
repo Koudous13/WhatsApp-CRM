@@ -36,13 +36,7 @@ type SmartSegment = {
     filters: { programmes: string[]; statuts: string[]; scoreMin: number; scoreMax: number }
 }
 
-const PROGRAMMES = [
-  { id: 'ClassTech', label: 'ClassTech', icon: '🤖' },
-  { id: 'Ecole229', label: 'École 229', icon: '🎓' },
-  { id: 'KMC', label: 'KMC', icon: '🔧' },
-  { id: 'Incubateur', label: 'Incubateur', icon: '🚀' },
-  { id: 'FabLab', label: 'FabLab', icon: '🛠️' },
-]
+type Programme = { id: string; nom: string; slug: string }
 
 const DB_TAGS = [
   { key: 'Prenom', label: 'Prénom', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
@@ -73,6 +67,8 @@ export default function BroadcastPage() {
     const [sending, setSending] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
     const [savedSegments, setSavedSegments] = useState<SmartSegment[]>([])
+    const [programmes, setProgrammes] = useState<Programme[]>([])
+    const [loadingProgrammes, setLoadingProgrammes] = useState(true)
     
     const fileInputRef = useRef<HTMLInputElement>(null)
     const messageRef = useRef<HTMLTextAreaElement>(null)
@@ -104,6 +100,7 @@ export default function BroadcastPage() {
     useEffect(() => {
       loadCampaigns()
       loadSavedSegments()
+      loadProgrammes()
       // Charger le brouillon
       const draft = localStorage.getItem('broadcast_draft')
       if (draft) {
@@ -144,6 +141,15 @@ export default function BroadcastPage() {
     async function loadSavedSegments() {
         const { data } = await supabase.from('Smart_Segments').select('*').order('created_at', { ascending: false })
         setSavedSegments((data as any) ?? [])
+    }
+
+    async function loadProgrammes() {
+        try {
+            const { data } = await supabase.from('programmes').select('id, nom, slug').order('nom')
+            setProgrammes((data as Programme[]) ?? [])
+        } finally {
+            setLoadingProgrammes(false)
+        }
     }
 
     async function estimateAudience() {
@@ -366,21 +372,29 @@ export default function BroadcastPage() {
                                 {!selectedSegmentId && csvData.length === 0 && (
                                   <div className="p-6 bg-slate-900/40 border border-slate-800 rounded-3xl space-y-4">
                                     <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest">Filtrer par programmes</h3>
-                                    <div className="flex flex-wrap gap-3">
-                                      {PROGRAMMES.map(p => (
-                                        <button 
-                                          key={p.id}
-                                          onClick={() => setFilterProgramme(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])}
-                                          className={cn(
-                                            "flex items-center gap-3 px-5 py-3 rounded-2xl border font-bold text-sm transition-all",
-                                            filterProgramme.includes(p.id) ? "bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-600/20 scale-105" : "bg-slate-800 border-slate-800 text-slate-400 opacity-60 hover:opacity-100"
-                                          )}
-                                        >
-                                          <span className="text-lg">{p.icon}</span>
-                                          {p.label}
-                                        </button>
-                                      ))}
-                                    </div>
+                                    {loadingProgrammes ? (
+                                      <p className="text-xs text-slate-600 italic font-medium">Chargement des programmes…</p>
+                                    ) : programmes.length === 0 ? (
+                                      <p className="text-xs text-slate-500 italic font-medium">
+                                        Aucun programme trouvé. Créez-en un depuis la page <span className="text-blue-400 font-bold">Programmes</span>.
+                                      </p>
+                                    ) : (
+                                      <div className="flex flex-wrap gap-3">
+                                        {programmes.map(p => (
+                                          <button
+                                            key={p.id}
+                                            onClick={() => setFilterProgramme(prev => prev.includes(p.nom) ? prev.filter(x => x !== p.nom) : [...prev, p.nom])}
+                                            className={cn(
+                                              "flex items-center gap-3 px-5 py-3 rounded-2xl border font-bold text-sm transition-all",
+                                              filterProgramme.includes(p.nom) ? "bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-600/20 scale-105" : "bg-slate-800 border-slate-800 text-slate-400 opacity-60 hover:opacity-100"
+                                            )}
+                                          >
+                                            <span className="text-lg">🎯</span>
+                                            {p.nom}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </section>
