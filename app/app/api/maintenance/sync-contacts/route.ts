@@ -69,15 +69,14 @@ export async function GET() {
                     statut_conversation: 'Inscription',
                     score_engagement: 80,
                     opt_in: true,
-                    // Ne pas écraser nombre_interactions s'il existe déjà sera un peu complexe avec UPSERT basique, 
-                    // mais dans notre cas c'est acceptable car c'est un backfill pour ceux qui n'existent pas ou c'est un update mineur.
                 };
             });
 
-            // Effectuer le UPSERT
+            // UPSERT avec mise a jour des profils existants — indispensable pour rattacher
+            // un inscrit existant a son programme (sinon le filtre broadcast le manque).
             const { error: syncError } = await supabase
                 .from('Profil_Prospects')
-                .upsert(profilesToUpsert, { onConflict: 'chat_id', ignoreDuplicates: true });
+                .upsert(profilesToUpsert, { onConflict: 'chat_id', ignoreDuplicates: false });
 
             if (syncError) {
                 details.push({ programme: prog.nom, table: tableName, error: syncError.message });
