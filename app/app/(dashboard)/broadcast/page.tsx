@@ -101,7 +101,7 @@ export default function BroadcastPage() {
       }, 0)
     }
 
-    useEffect(() => { 
+    useEffect(() => {
       loadCampaigns()
       loadSavedSegments()
       // Charger le brouillon
@@ -112,6 +112,14 @@ export default function BroadcastPage() {
         setVariants(parsed.variants || [{ id: '1', body: '', ratio: 100 }])
       }
     }, [])
+
+    // Polling 3s pour afficher la progression en direct tant qu'au moins une campagne tourne
+    useEffect(() => {
+      const hasRunning = campaigns.some(c => c.status === 'running')
+      if (!hasRunning) return
+      const id = setInterval(loadCampaigns, 3000)
+      return () => clearInterval(id)
+    }, [campaigns])
 
     // Audience Estimation Effect
     useEffect(() => {
@@ -713,9 +721,12 @@ export default function BroadcastPage() {
                                 "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
                                 c.status === 'completed' ? "bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white" :
                                 c.status === 'scheduled' ? "bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-white" :
+                                c.status === 'running' ? "bg-blue-500/10 text-blue-400 animate-pulse" :
                                 "bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white"
                               )}>
-                                {c.status === 'scheduled' ? <Clock size={28} /> : <Target size={28} />}
+                                {c.status === 'scheduled' ? <Clock size={28} /> :
+                                 c.status === 'running' ? <Loader2 size={28} className="animate-spin" /> :
+                                 <Target size={28} />}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3">
@@ -735,12 +746,21 @@ export default function BroadcastPage() {
                               
                               <div className="hidden md:flex items-center gap-8">
                                 <div className="text-right">
-                                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Succès</p>
-                                  <p className="text-lg font-black text-emerald-400">{(c.sent_count / (c.total_recipients || 1) * 100).toFixed(0)}%</p>
+                                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">
+                                    {c.status === 'running' ? 'En cours' : 'Succès'}
+                                  </p>
+                                  <p className={cn(
+                                    "text-lg font-black",
+                                    c.status === 'running' ? "text-blue-400" : "text-emerald-400"
+                                  )}>
+                                    {c.status === 'running'
+                                      ? `${c.sent_count + c.failed_count} / ${c.total_recipients}`
+                                      : `${(c.sent_count / (c.total_recipients || 1) * 100).toFixed(0)}%`}
+                                  </p>
                                 </div>
                                 <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
                                   <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${(c.delivered_count / (c.total_recipients || 1)) * 100}%` }} />
-                                  <div className="bg-blue-500/50 h-full" style={{ width: `${((c.sent_count - c.delivered_count) / (c.total_recipients || 1)) * 100}%` }} />
+                                  <div className="bg-rose-500/60 h-full transition-all duration-1000" style={{ width: `${(c.failed_count / (c.total_recipients || 1)) * 100}%` }} />
                                 </div>
                               </div>
 

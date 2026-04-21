@@ -163,7 +163,8 @@ async function sendAdvancedBroadcast(
 
     for (let i = 0; i < audience.length; i++) {
         const person = audience[i]
-        
+        const chatId = String(person.chat_id)
+
         // Choix de la variante
         const random = Math.random() * 100
         let cumulative = 0
@@ -186,27 +187,48 @@ async function sendAdvancedBroadcast(
         }
 
         try {
-            console.log(`[Broadcast ${campaignId}] Envoi à ${person.chat_id} (${i + 1}/${audience.length})`);
-            await sendWhatsAppMessage(String(person.chat_id), personalizedBody)
+            console.log(`[Broadcast ${campaignId}] Envoi à ${chatId} (${i + 1}/${audience.length})`);
+            await sendWhatsAppMessage(chatId, personalizedBody)
             sent++
-            
-            // LOG RÉUSSITE PAR DÉFAUT (debug)
+
+            // Enregistrer le message dans l'inbox (conversation + message outbound)
+            const conversationId = await ensureConversation(supabase, chatId)
+            if (conversationId) {
+                await supabase.from('messages').insert({
+                    conversation_id: conversationId,
+                    contact_chat_id: chatId,
+                    direction: 'outbound',
+                    message_type: 'text',
+                    body: personalizedBody,
+                    is_ai_response: false,
+                    delivery_status: 'sent',
+                })
+            }
+
             await supabase.from('ai_logs').insert({
-                contact_chat_id: person.chat_id,
+                contact_chat_id: chatId,
                 user_message: `BROADCAST OK: ${i + 1}/${audience.length}`,
                 system_prompt: `Campagne: ${campaignId}`
             })
         } catch (err: any) {
-            console.error(`[Broadcast ${campaignId}] Échec pour ${person.chat_id}:`, err);
+            console.error(`[Broadcast ${campaignId}] Échec pour ${chatId}:`, err);
             failed++
-            
-            // LOG ÉCHEC
+
             await supabase.from('ai_logs').insert({
-                contact_chat_id: person.chat_id,
+                contact_chat_id: chatId,
                 user_message: `BROADCAST ÉCHEC: ${String(err).substring(0, 100)}`,
                 system_prompt: `Campagne: ${campaignId}`
             })
         }
+
+        // Progression live après chaque itération (UI polling lit ces champs)
+        await supabase.from('broadcasts')
+            .update({
+                sent_count: sent,
+                delivered_count: sent,
+                failed_count: failed,
+            })
+            .eq('id', campaignId)
 
         // Rate limiting anti-ban - AUGMENTÉ À 5.5s pour tester le timeout Vercel (Hobby = 10s)
         if (i < audience.length - 1) {
@@ -214,21 +236,48 @@ async function sendAdvancedBroadcast(
         }
     }
 
-    // Mise à jour finale UNIQUE
+    // Mise à jour finale (status completed + sent_at)
     await supabase.from('broadcasts')
-        .update({ 
+        .update({
             status: 'completed',
-            sent_count: sent, 
+            sent_count: sent,
             failed_count: failed,
             delivered_count: sent,
             sent_at: new Date().toISOString(),
         })
         .eq('id', campaignId)
 
-    // LOG FIN
     await supabase.from('ai_logs').insert({
         contact_chat_id: 'SYSTEM_BROADCAST',
         user_message: `FIN CAMPAGNE: ${campaignId}`,
         system_prompt: `Total: ${sent}/${audience.length} envoyés.`
     })
+}
+
+/**
+ * Retourne l'id de la conversation la plus récente pour un contact,
+ * ou en crée une nouvelle si aucune n'existe. Même pattern que le webhook.
+ */
+async function ensureConversation(supabase: any, chatId: string): Promise<string | null> {
+    const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('contact_chat_id', chatId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    if (existing?.id) return existing.id
+
+    const { data: created, error } = await supabase
+        .from('conversations')
+        .insert({ contact_chat_id: chatId, status: 'ai_active' })
+        .select('id')
+        .single()
+
+    if (error) {
+        console.error(`[Broadcast] Impossible de créer la conversation pour ${chatId}:`, error)
+        return null
+    }
+    return created.id
 }
