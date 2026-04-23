@@ -3,10 +3,10 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const sequenceId = params.id
+        const sequenceId = (await params).id
         if (!sequenceId) return NextResponse.json({ error: 'ID requis' }, { status: 400 })
 
         const supabase = createAdminClient()
