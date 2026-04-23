@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { Variant, AudienceFilters, getAudience, sendAdvancedBroadcast } from '@/lib/broadcast/sender'
-
 export async function POST(req: NextRequest) {
     try {
         const { 
