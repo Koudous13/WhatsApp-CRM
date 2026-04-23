@@ -36,6 +36,13 @@ export async function POST(req: NextRequest) {
         for (let i = 0; i < steps.length; i++) {
             const step = steps[i]
             const stepDate = new Date(start.getTime() + step.offsetDays * 24 * 60 * 60 * 1000)
+            
+            // Appliquer l'heure d'envoi spécifique si fournie
+            if (step.sendTime) {
+                const [hours, minutes] = step.sendTime.split(':').map(Number)
+                stepDate.setHours(hours, minutes, 0, 0)
+            }
+
             const isImmediate = stepDate <= now
 
             // Pour l'immédiat, on doit évaluer l'audience locale

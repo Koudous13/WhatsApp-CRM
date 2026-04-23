@@ -19,11 +19,11 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
     const [programmeNom, setProgrammeNom] = useState('')
     const [startDate, setStartDate] = useState('')
     const [filterOptIn, setFilterOptIn] = useState(true)
-    const [steps, setSteps] = useState([{ offsetDays: 0, body: '' }])
+    const [steps, setSteps] = useState([{ offsetDays: 0, sendTime: '10:00', body: '' }])
     
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
-    const [programmeTags, setProgrammeTags] = useState<{name: string, field_type: string}[]>([])
+    const [programmeTags, setProgrammeTags] = useState<{name: string, type: string}[]>([])
     const [fetchingTags, setFetchingTags] = useState(false)
 
     const supabase = createClient()
@@ -39,7 +39,7 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
                 // Trouver le programme par nom
                 const prog = programmes.find(p => p.nom === programmeNom)
                 if (prog) {
-                    const { data } = await supabase.from('programme_champs').select('name, field_type').eq('programme_id', prog.id)
+                    const { data } = await supabase.from('programme_champs').select('name, type').eq('programme_id', prog.id)
                     if (data) {
                         setProgrammeTags(data)
                     }
@@ -79,14 +79,14 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
 
     const addStep = () => {
         const lastOffset = steps.length > 0 ? steps[steps.length - 1].offsetDays : 0
-        setSteps([...steps, { offsetDays: lastOffset + 1, body: '' }])
+        setSteps([...steps, { offsetDays: lastOffset + 1, sendTime: '10:00', body: '' }])
     }
 
     const removeStep = (index: number) => {
         setSteps(steps.filter((_, i) => i !== index))
     }
 
-    const updateStep = (index: number, field: 'offsetDays' | 'body', value: any) => {
+    const updateStep = (index: number, field: 'offsetDays' | 'body' | 'sendTime', value: any) => {
         const newSteps = [...steps]
         newSteps[index] = { ...newSteps[index], [field]: value }
         setSteps(newSteps)
@@ -94,9 +94,9 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
 
     const applyTemplate = () => {
         setSteps([
-            { offsetDays: 0, body: 'Bonjour {Prenom}, bienvenue dans le programme !' },
-            { offsetDays: 3, body: 'Bonjour {Prenom}, comment avancez-vous depuis notre dernier échange ?' },
-            { offsetDays: 7, body: 'Bonjour {Prenom}, voici quelques ressources supplémentaires pour vous...' }
+            { offsetDays: 0, sendTime: '10:00', body: 'Bonjour {Prenom}, bienvenue dans le programme !' },
+            { offsetDays: 3, sendTime: '10:00', body: 'Bonjour {Prenom}, comment avancez-vous depuis notre dernier échange ?' },
+            { offsetDays: 7, sendTime: '10:00', body: 'Bonjour {Prenom}, voici quelques ressources supplémentaires pour vous...' }
         ])
     }
 
@@ -153,13 +153,15 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-slate-800/60 bg-slate-900/40 shrink-0">
                     <div>
-                        <h2 className="text-xl font-black text-white flex items-center gap-2">
-                            <Clock className="text-amber-500" />
-                            Créer une séquence
+                        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500 flex items-center gap-3">
+                            <div className="p-2 bg-amber-500/10 rounded-xl">
+                                <Clock size={24} className="text-amber-500" />
+                            </div>
+                            Séquence de Relances
                         </h2>
-                        <p className="text-slate-500 text-xs font-medium">Programmez des relances automatiques décalées dans le temps.</p>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1 ml-11">Automation Workflows • Beta</p>
                     </div>
-                    <button onClick={onClose} className="p-3 bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-all">
+                    <button onClick={onClose} className="p-3 bg-slate-800/50 hover:bg-slate-700/80 text-slate-400 hover:text-white rounded-2xl transition-all border border-slate-700/50 hover:border-slate-600 active:scale-95">
                         <X size={20} />
                     </button>
                 </div>
@@ -231,18 +233,29 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
                             {steps.map((step, index) => (
                                 <div key={index} className="flex gap-4 p-5 bg-slate-900/60 border border-slate-800 rounded-3xl relative group">
                                     {/* Offset Badge */}
-                                    <div className="w-20 shrink-0 flex flex-col gap-2 items-center justify-start border-r border-slate-800 pr-4">
-                                        <div className="w-12 h-12 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-2xl flex items-center justify-center font-black text-lg">
-                                            J+{step.offsetDays}
+                                    <div className="w-24 shrink-0 flex flex-col gap-3 items-center justify-start border-r border-slate-800/50 pr-4">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Timing</div>
+                                        <div className="w-full space-y-2">
+                                            <div className="relative group/time">
+                                                <input 
+                                                    type="number"
+                                                    value={step.offsetDays}
+                                                    onChange={e => updateStep(index, 'offsetDays', parseInt(e.target.value) || 0)}
+                                                    className="w-full bg-[#0a0f1e] border border-slate-800 rounded-xl py-2 px-2 text-amber-500 text-sm font-black text-center outline-none focus:border-amber-500/50 transition-all"
+                                                />
+                                                <div className="text-[8px] text-center text-slate-600 font-bold mt-1">JOURS</div>
+                                            </div>
+                                            
+                                            <div className="relative group/clock">
+                                                <input 
+                                                    type="time"
+                                                    value={step.sendTime || '10:00'}
+                                                    onChange={e => updateStep(index, 'sendTime', e.target.value)}
+                                                    className="w-full bg-[#0a0f1e] border border-slate-800 rounded-xl py-2 px-1 text-blue-400 text-[10px] font-black text-center outline-none focus:border-blue-500/50 transition-all"
+                                                />
+                                                <div className="text-[8px] text-center text-slate-600 font-bold mt-1">HEURE</div>
+                                            </div>
                                         </div>
-                                        <input 
-                                            type="number"
-                                            value={step.offsetDays}
-                                            onChange={e => updateStep(index, 'offsetDays', parseInt(e.target.value) || 0)}
-                                            className="w-full bg-[#0a0f1e] border border-slate-800 rounded-lg py-1 px-2 text-white text-xs font-bold text-center outline-none focus:border-amber-500/50"
-                                            title="Jours après le début"
-                                        />
-                                        <p className="text-[9px] text-slate-600 font-bold uppercase">Jours</p>
                                     </div>
 
                                     {/* Message Body */}
@@ -260,27 +273,35 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
                                             </button>
                                         </div>
 
-                                        {programmeNom && programmeTags.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mb-2 p-2 bg-slate-950/50 rounded-xl border border-slate-800/50">
-                                                <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest mr-1 flex items-center">
-                                                    Tags :
+                                        {programmeNom && (programmeTags.length > 0 || fetchingTags) ? (
+                                            <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-950/40 rounded-2xl border border-slate-800/40 backdrop-blur-sm">
+                                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] w-full mb-1 flex items-center gap-2">
+                                                    <Zap size={10} className="text-amber-500" /> Variables du Programme :
                                                 </span>
-                                                {/* Tags de base optionnels si besoin, ou on affiche directement les champs du programme */}
-                                                {programmeTags.map(t => (
-                                                    <button 
-                                                        key={t.name}
-                                                        onClick={() => insertTag(index, t.name)}
-                                                        className="px-2 py-1 rounded-lg text-[9px] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all"
-                                                        title={`Insérer la colonne ${t.name}`}
-                                                    >
-                                                        {t.name}
-                                                    </button>
-                                                ))}
+                                                {fetchingTags ? (
+                                                    <div className="flex items-center gap-2 px-3 py-1">
+                                                        <Loader2 size={12} className="animate-spin text-slate-600" />
+                                                        <span className="text-[10px] text-slate-600 font-bold uppercase italic">Chargement...</span>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {programmeTags.map(t => (
+                                                            <button 
+                                                                key={t.name}
+                                                                onClick={() => insertTag(index, t.name)}
+                                                                className="px-3 py-1.5 rounded-xl text-[10px] font-black bg-blue-500/5 text-blue-400 border border-blue-500/10 hover:bg-blue-500 hover:text-white hover:scale-105 transition-all"
+                                                                title={`Insérer {${t.name}}`}
+                                                            >
+                                                                {t.name}
+                                                            </button>
+                                                        ))}
+                                                        {programmeTags.length === 0 && (
+                                                            <span className="text-[10px] text-slate-600 font-bold p-2 italic">Aucune colonne spécifique trouvée</span>
+                                                        )}
+                                                    </>
+                                                )}
                                             </div>
-                                        )}
-                                        {programmeNom && fetchingTags && (
-                                            <div className="text-[10px] text-slate-500 italic mb-2">Chargement des variables...</div>
-                                        )}
+                                        ) : null}
 
                                         <textarea
                                             id={`step-textarea-${index}`}
