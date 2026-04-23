@@ -55,6 +55,7 @@ export async function getAudience(supabase: any, filters: AudienceFilters, csvDa
                 ScoreEngagement: String(r.score_engagement || 0),
             }
         }))
+    } else {
         let customDataMap = new Map()
         let singleProgrammeName = ''
         
@@ -109,6 +110,7 @@ export async function getAudience(supabase: any, filters: AudienceFilters, csvDa
                 metadata: { ...baseMetadata, ...customData }
             }
         })
+    }
 
     return audience
 }

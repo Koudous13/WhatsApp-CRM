@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { createClient } from '@/lib/supabase/client'
 import { X, Calendar, MessageSquare, Plus, Send, Target, Clock, Zap, Loader2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -25,9 +26,6 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
     const [programmeTags, setProgrammeTags] = useState<{name: string, type: string}[]>([])
     const [fetchingTags, setFetchingTags] = useState(false)
 
-    // Quand le programme change, on charge ses colonnes
-    import { useEffect } from 'react'
-    import { createClient } from '@/lib/supabase/client'
     const supabase = createClient()
 
     useEffect(() => {
