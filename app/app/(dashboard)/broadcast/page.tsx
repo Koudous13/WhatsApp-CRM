@@ -164,8 +164,16 @@ export default function BroadcastPage() {
     async function loadSequences() {
         setLoadingSequences(true)
         try {
-            const { data } = await supabase.from('broadcast_sequences').select('*').order('created_at', { ascending: false })
+            const { data, error } = await supabase.from('broadcast_sequences').select('*').order('created_at', { ascending: false })
+            if (error) {
+                console.error("Error loading sequences:", error)
+                setErrorMsg("Erreur lors du chargement des séquences: " + error.message)
+                return
+            }
+            console.log("Loaded sequences:", data)
             setSequences(data || [])
+        } catch (err: any) {
+            console.error("Critical error loading sequences:", err)
         } finally {
             setLoadingSequences(false)
         }
