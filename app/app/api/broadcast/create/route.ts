@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendWhatsAppMessage } from '@/lib/wasender/client'
-import { waitUntil } from '@vercel/functions'
-
-type Variant = {
-    id: string
-    body: string
-    ratio: number
-}
-
-type SegmentFilters = {
-    programmes: string[]
-    statuts: string[]
-    scoreMin: number
-    scoreMax: number
-}
+import { Variant, AudienceFilters, getAudience, sendAdvancedBroadcast } from '@/lib/broadcast/sender'
 
 export async function POST(req: NextRequest) {
     try {
@@ -35,71 +21,16 @@ export async function POST(req: NextRequest) {
 
         const supabase = createAdminClient()
 
-        // 1. Déterminer l'audience
-        let audience: { chat_id: string, metadata?: any }[] = []
-
-        if (csvData && csvData.length > 0) {
-            audience = csvData.map((row: any) => ({
-                chat_id: row.phone || row.Phone || row.whatsapp || row.chat_id || row.telephone || row.Telephone || row.numero || row.Numero || row.Numéro,
-                metadata: row
-            })).filter((a: any) => a.chat_id)
-        } else if (selectedSegmentId && segmentFilters) {
-            const sf: SegmentFilters = segmentFilters
-            let query = supabase
-                .from('Profil_Prospects')
-                .select('chat_id, prenom, nom, programme_recommande, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
-            
-            if (filterOptIn !== false) query = query.eq('opt_in', true)
-            if (sf.programmes && sf.programmes.length > 0) query = query.in('programme_recommande', sf.programmes)
-            if (sf.statuts && sf.statuts.length > 0) query = query.in('statut_conversation', sf.statuts)
-            if (sf.scoreMin > 0) query = query.gte('score_engagement', sf.scoreMin)
-            if (sf.scoreMax < 100) query = query.lte('score_engagement', sf.scoreMax)
-            
-            const { data: recipients, error: segError } = await query
-            if (segError) throw new Error(`Erreur segment: ${segError.message}`)
-            
-            audience = (recipients || []).map(r => ({
-                chat_id: r.chat_id,
-                metadata: {
-                    Prenom: r.prenom || '',
-                    Nom: r.nom || '',
-                    Programme: r.programme_recommande || '',
-                    Statut: r.statut_conversation || '',
-                    Ville: r.ville || '',
-                    Objectif: r.objectif || '',
-                    Budget: r.budget_mentionne || '',
-                    ScoreEngagement: String(r.score_engagement || 0),
-                }
-            }))
-        } else {
-            let query = supabase
-                .from('Profil_Prospects')
-                .select('chat_id, prenom, nom, programme_recommande, statut_conversation, ville, objectif, budget_mentionne, score_engagement')
-            
-            if (filterOptIn !== false) query = query.eq('opt_in', true)
-            if (Array.isArray(filterProgramme) && filterProgramme.length > 0) {
-                query = query.in('programme_recommande', filterProgramme)
-            } else if (typeof filterProgramme === 'string' && filterProgramme !== 'Tous') {
-                query = query.eq('programme_recommande', filterProgramme)
-            }
-            
-            const { data: recipients, error: queryError } = await query
-            if (queryError) throw new Error(`Erreur requête: ${queryError.message}`)
-
-            audience = (recipients || []).map(r => ({
-                chat_id: r.chat_id,
-                metadata: {
-                    Prenom: r.prenom || '',
-                    Nom: r.nom || '',
-                    Programme: r.programme_recommande || '',
-                    Statut: r.statut_conversation || '',
-                    Ville: r.ville || '',
-                    Objectif: r.objectif || '',
-                    Budget: r.budget_mentionne || '',
-                    ScoreEngagement: String(r.score_engagement || 0),
-                }
-            }))
+        const filters: AudienceFilters = {
+            programme: filterProgramme,
+            opt_in: filterOptIn,
+            has_csv: !!(csvData && csvData.length > 0),
+            segment_id: selectedSegmentId || null,
+            segment_filters: segmentFilters
         }
+
+        // 1. Déterminer l'audience
+        const audience = await getAudience(supabase, filters, csvData)
 
         if (!audience.length) {
             return NextResponse.json({ 
@@ -124,12 +55,7 @@ export async function POST(req: NextRequest) {
                 status: scheduledAt ? 'scheduled' : 'running',
                 total_recipients: audience.length,
                 scheduled_at: scheduledAt || null,
-                audience_filters: { 
-                    programme: filterProgramme, 
-                    opt_in: filterOptIn, 
-                    has_csv: !!csvData,
-                    segment_id: selectedSegmentId || null,
-                },
+                audience_filters: filters,
             })
             .select()
             .single()
@@ -152,132 +78,4 @@ export async function POST(req: NextRequest) {
     }
 }
 
-async function sendAdvancedBroadcast(
-    campaignId: string,
-    variants: Variant[],
-    audience: { chat_id: string, metadata?: any }[],
-    supabase: any
-) {
-    let sent = 0
-    let failed = 0
 
-    for (let i = 0; i < audience.length; i++) {
-        const person = audience[i]
-        const chatId = String(person.chat_id)
-
-        // Choix de la variante
-        const random = Math.random() * 100
-        let cumulative = 0
-        let selectedVariant = variants[0]
-        for (const v of variants) {
-            cumulative += v.ratio
-            if (random <= cumulative) {
-                selectedVariant = v
-                break
-            }
-        }
-
-        // Remplacement sécurisé des tags
-        let personalizedBody = selectedVariant.body
-        if (person.metadata) {
-            Object.entries(person.metadata).forEach(([key, val]) => {
-                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                personalizedBody = personalizedBody.replace(new RegExp(`\\{${escapedKey}\\}`, 'gi'), String(val || ''))
-            })
-        }
-
-        try {
-            console.log(`[Broadcast ${campaignId}] Envoi à ${chatId} (${i + 1}/${audience.length})`);
-            await sendWhatsAppMessage(chatId, personalizedBody)
-            sent++
-
-            // Enregistrer le message dans l'inbox (conversation + message outbound)
-            const conversationId = await ensureConversation(supabase, chatId)
-            if (conversationId) {
-                await supabase.from('messages').insert({
-                    conversation_id: conversationId,
-                    contact_chat_id: chatId,
-                    direction: 'outbound',
-                    message_type: 'text',
-                    body: personalizedBody,
-                    is_ai_response: false,
-                    delivery_status: 'sent',
-                })
-            }
-
-            await supabase.from('ai_logs').insert({
-                contact_chat_id: chatId,
-                user_message: `BROADCAST OK: ${i + 1}/${audience.length}`,
-                system_prompt: `Campagne: ${campaignId}`
-            })
-        } catch (err: any) {
-            console.error(`[Broadcast ${campaignId}] Échec pour ${chatId}:`, err);
-            failed++
-
-            await supabase.from('ai_logs').insert({
-                contact_chat_id: chatId,
-                user_message: `BROADCAST ÉCHEC: ${String(err).substring(0, 100)}`,
-                system_prompt: `Campagne: ${campaignId}`
-            })
-        }
-
-        // Progression live après chaque itération (UI polling lit ces champs)
-        await supabase.from('broadcasts')
-            .update({
-                sent_count: sent,
-                delivered_count: sent,
-                failed_count: failed,
-            })
-            .eq('id', campaignId)
-
-        // Rate limiting anti-ban - AUGMENTÉ À 5.5s pour tester le timeout Vercel (Hobby = 10s)
-        if (i < audience.length - 1) {
-            await new Promise(r => setTimeout(r, 5500))
-        }
-    }
-
-    // Mise à jour finale (status completed + sent_at)
-    await supabase.from('broadcasts')
-        .update({
-            status: 'completed',
-            sent_count: sent,
-            failed_count: failed,
-            delivered_count: sent,
-            sent_at: new Date().toISOString(),
-        })
-        .eq('id', campaignId)
-
-    await supabase.from('ai_logs').insert({
-        contact_chat_id: 'SYSTEM_BROADCAST',
-        user_message: `FIN CAMPAGNE: ${campaignId}`,
-        system_prompt: `Total: ${sent}/${audience.length} envoyés.`
-    })
-}
-
-/**
- * Retourne l'id de la conversation la plus récente pour un contact,
- * ou en crée une nouvelle si aucune n'existe. Même pattern que le webhook.
- */
-async function ensureConversation(supabase: any, chatId: string): Promise<string | null> {
-    const { data: existing } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('contact_chat_id', chatId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-    if (existing?.id) return existing.id
-
-    const { data: created, error } = await supabase
-        .from('conversations')
-        .insert({ contact_chat_id: chatId, status: 'ai_active' })
-        .select('id')
-        .single()
-
-    if (error) {
-        console.error(`[Broadcast] Impossible de créer la conversation pour ${chatId}:`, error)
-        return null
-    }
-    return created.id
-}

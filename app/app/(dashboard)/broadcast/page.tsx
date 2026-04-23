@@ -8,8 +8,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Send, Users, MessageSquare, Calendar, ChevronRight, ChevronLeft, 
   Plus, Trash2, Globe, FileText, CheckCircle2, AlertCircle, 
-  Loader2, Smartphone, Target, Zap, Clock, Info, Sparkles
+  Loader2, Smartphone, Target, Zap, Clock, Info, Sparkles, Network
 } from 'lucide-react'
+import SequenceModal from '@/components/broadcast/SequenceModal'
 
 type Variant = {
     id: string
@@ -28,6 +29,8 @@ type Campaign = {
     sent_count: number
     delivered_count: number
     failed_count: number
+    sequence_id?: string | null
+    sequence_step_index?: number | null
 }
 
 type SmartSegment = {
@@ -49,6 +52,7 @@ export default function BroadcastPage() {
     const supabase = createClient()
     const [step, setStep] = useState(1) // 1: Audience, 2: Message, 3: Schedule
     const [showCreate, setShowCreate] = useState(false)
+    const [showSequence, setShowSequence] = useState(false)
     const [campaigns, setCampaigns] = useState<Campaign[]>([])
     
     // Form State
@@ -271,19 +275,38 @@ export default function BroadcastPage() {
                   </h1>
                   <p className="text-slate-400 text-sm font-medium mt-1">Multipliez votre impact avec des campagnes ciblées.</p>
                 </div>
-                <button 
-                  onClick={() => setShowCreate(!showCreate)} 
-                  className={cn(
-                    "px-6 py-3 rounded-2xl font-black text-sm transition-all flex items-center gap-2",
-                    showCreate ? "bg-slate-800 text-slate-400 hover:text-white" : "bg-blue-600 hover:bg-blue-500 text-white shadow-xl shadow-blue-600/20"
-                  )}
-                >
-                  {showCreate ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} strokeWidth={3} />}
-                  {showCreate ? 'ANNULER' : 'LANCER UNE CAMPAGNE'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setShowSequence(!showSequence)} 
+                    className="px-6 py-3 rounded-2xl font-black text-sm transition-all flex items-center gap-2 bg-amber-600/10 text-amber-500 hover:bg-amber-600/20 border border-amber-600/20"
+                  >
+                    <Network size={18} strokeWidth={3} />
+                    CRÉER UNE SÉQUENCE
+                  </button>
+                  <button 
+                    onClick={() => setShowCreate(!showCreate)} 
+                    className={cn(
+                      "px-6 py-3 rounded-2xl font-black text-sm transition-all flex items-center gap-2",
+                      showCreate ? "bg-slate-800 text-slate-400 hover:text-white" : "bg-blue-600 hover:bg-blue-500 text-white shadow-xl shadow-blue-600/20"
+                    )}
+                  >
+                    {showCreate ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} strokeWidth={3} />}
+                    {showCreate ? 'ANNULER' : 'LANCER UNE CAMPAGNE'}
+                  </button>
+                </div>
             </header>
 
             <main className="flex-1 min-h-0 relative">
+              <AnimatePresence>
+                {showSequence && (
+                  <SequenceModal 
+                    onClose={() => setShowSequence(false)}
+                    programmes={programmes}
+                    onSuccess={() => { loadCampaigns(); setShowSequence(false); }}
+                  />
+                )}
+              </AnimatePresence>
+
               <AnimatePresence mode="wait">
                 {showCreate ? (
                   <motion.div 
@@ -744,6 +767,11 @@ export default function BroadcastPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3">
+                                  {c.sequence_id && (
+                                    <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1">
+                                      <Network size={12} /> Séquence
+                                    </span>
+                                  )}
                                   <h3 className="font-black text-white text-lg truncate pr-4">{c.name}</h3>
                                   <span className={cn(
                                     "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
