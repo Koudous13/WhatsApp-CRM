@@ -42,7 +42,7 @@ export async function getAudience(supabase: any, filters: AudienceFilters, csvDa
         const { data: recipients, error: segError } = await query
         if (segError) throw new Error(`Erreur segment: ${segError.message}`)
         
-        audience = (recipients || []).map(r => ({
+        audience = (recipients || []).map((r: any) => ({
             chat_id: r.chat_id,
             metadata: {
                 Prenom: r.prenom || '',
@@ -92,7 +92,7 @@ export async function getAudience(supabase: any, filters: AudienceFilters, csvDa
         const { data: recipients, error: queryError } = await query
         if (queryError) throw new Error(`Erreur requête: ${queryError.message}`)
 
-        audience = (recipients || []).map(r => {
+        audience = (recipients || []).map((r: any) => {
             const baseMetadata = {
                 Prenom: r.prenom || '',
                 Nom: r.nom || '',

@@ -23,7 +23,7 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
     
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
-    const [programmeTags, setProgrammeTags] = useState<{name: string, type: string}[]>([])
+    const [programmeTags, setProgrammeTags] = useState<{name: string, field_type: string}[]>([])
     const [fetchingTags, setFetchingTags] = useState(false)
 
     const supabase = createClient()
