@@ -73,6 +73,10 @@ export default function BroadcastPage() {
     const [savedSegments, setSavedSegments] = useState<SmartSegment[]>([])
     const [programmes, setProgrammes] = useState<Programme[]>([])
     const [loadingProgrammes, setLoadingProgrammes] = useState(true)
+    const [viewMode, setViewMode] = useState<'broadcasts' | 'sequences'>('broadcasts')
+    const [sequences, setSequences] = useState<any[]>([])
+    const [editingSequence, setEditingSequence] = useState<any>(null)
+    const [loadingSequences, setLoadingSequences] = useState(false)
     
     const fileInputRef = useRef<HTMLInputElement>(null)
     const messageRef = useRef<HTMLTextAreaElement>(null)
@@ -105,6 +109,7 @@ export default function BroadcastPage() {
       loadCampaigns()
       loadSavedSegments()
       loadProgrammes()
+      loadSequences()
       // Charger le brouillon
       const draft = localStorage.getItem('broadcast_draft')
       if (draft) {
@@ -153,6 +158,16 @@ export default function BroadcastPage() {
             setProgrammes((data as Programme[]) ?? [])
         } finally {
             setLoadingProgrammes(false)
+        }
+    }
+
+    async function loadSequences() {
+        setLoadingSequences(true)
+        try {
+            const { data } = await supabase.from('broadcast_sequences').select('*').order('created_at', { ascending: false })
+            setSequences(data || [])
+        } finally {
+            setLoadingSequences(false)
         }
     }
 
@@ -223,6 +238,19 @@ export default function BroadcastPage() {
       setShowCreate(true)
     }
 
+    function handleEditSequence(s: any) {
+      setEditingSequence(s)
+      setShowSequence(true)
+    }
+
+    async function deleteSequence(id: string) {
+      if (!confirm("Voulez-vous vraiment supprimer cette séquence ? Cela supprimera également tous les messages planifiés associés.")) return
+      try {
+        const res = await fetch(`/api/broadcast/sequence/${id}`, { method: 'DELETE' })
+        if (res.ok) loadSequences()
+      } catch (err) { console.error(err) }
+    }
+
     const nextStep = () => {
       if (step === 1 && !name.trim()) { setErrorMsg("Donnez un nom à votre campagne"); return }
       if (step === 2 && !activeVariant.body.trim()) { setErrorMsg("Le message ne peut pas être vide"); return }
@@ -276,8 +304,19 @@ export default function BroadcastPage() {
                   <p className="text-slate-400 text-sm font-medium mt-1">Multipliez votre impact avec des campagnes ciblées.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <div className="flex bg-slate-900/40 p-1 rounded-2xl border border-slate-800/60 mr-4">
+                    <button 
+                      onClick={() => setViewMode('broadcasts')}
+                      className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", viewMode === 'broadcasts' ? "bg-blue-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300")}
+                    >Diffusions</button>
+                    <button 
+                      onClick={() => setViewMode('sequences')}
+                      className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", viewMode === 'sequences' ? "bg-amber-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300")}
+                    >Séquences</button>
+                  </div>
+
                   <button 
-                    onClick={() => setShowSequence(!showSequence)} 
+                    onClick={() => { setEditingSequence(null); setShowSequence(true); }} 
                     className="px-6 py-3 rounded-2xl font-black text-sm transition-all flex items-center gap-2 bg-amber-600/10 text-amber-500 hover:bg-amber-600/20 border border-amber-600/20"
                   >
                     <Network size={18} strokeWidth={3} />
@@ -300,9 +339,10 @@ export default function BroadcastPage() {
               <AnimatePresence>
                 {showSequence && (
                   <SequenceModal 
-                    onClose={() => setShowSequence(false)}
+                    onClose={() => { setShowSequence(false); setEditingSequence(null); }}
                     programmes={programmes}
-                    onSuccess={() => { loadCampaigns(); setShowSequence(false); }}
+                    onSuccess={() => { loadCampaigns(); loadSequences(); setShowSequence(false); setEditingSequence(null); }}
+                    editingSequence={editingSequence}
                   />
                 )}
               </AnimatePresence>
@@ -737,139 +777,184 @@ export default function BroadcastPage() {
                     </div>
                   </motion.div>
                 ) : (
-                  <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-4xl mx-auto">
-                    {campaigns.length === 0 ? (
-                      <div className="bg-[#1e293b]/20 border border-dashed border-slate-800 rounded-[3rem] p-20 text-center space-y-6">
-                        <div className="w-24 h-24 bg-slate-800/40 rounded-full flex items-center justify-center mx-auto transition-transform hover:scale-110">
-                          <Send size={40} className="text-slate-600" />
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-slate-400 font-black uppercase tracking-widest text-sm">Le silence est d'or</p>
-                          <p className="text-slate-600 text-sm max-w-xs mx-auto font-medium">Votre historique de diffusion est vide. Prêt à faire du bruit ?</p>
-                        </div>
-                        <button onClick={() => setShowCreate(true)} className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-6 py-3 rounded-2xl font-black text-xs hover:bg-blue-600/40 transition-all">CRÉER MA PREMIÈRE CAMPAGNE</button>
-                      </div>
-                    ) : (
+                  <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                    {viewMode === 'sequences' ? (
                       <div className="grid gap-4">
-                        {campaigns.map(c => (
-                          <div key={c.id} className="flex flex-col">
-                            <div className="group bg-[#1e293b]/30 border border-slate-800/60 hover:border-slate-700/80 rounded-[2rem] p-6 transition-all hover:bg-[#1e293b]/50 flex items-center gap-6">
-                              <div className={cn(
-                                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
-                                c.status === 'completed' ? "bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white" :
-                                c.status === 'scheduled' ? "bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-white" :
-                                c.status === 'running' ? "bg-blue-500/10 text-blue-400 animate-pulse" :
-                                "bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white"
-                              )}>
-                                {c.status === 'scheduled' ? <Clock size={28} /> :
-                                 c.status === 'running' ? <Loader2 size={28} className="animate-spin" /> :
-                                 <Target size={28} />}
+                        {sequences.length === 0 ? (
+                          <div className="bg-[#1e293b]/20 border border-dashed border-slate-800 rounded-[3rem] p-20 text-center space-y-6">
+                            <div className="w-24 h-24 bg-slate-800/40 rounded-full flex items-center justify-center mx-auto">
+                              <Network size={40} className="text-slate-600" />
+                            </div>
+                            <p className="text-slate-400 font-black uppercase tracking-widest text-sm">Aucune séquence active</p>
+                            <button onClick={() => setShowSequence(true)} className="bg-amber-600/20 text-amber-500 border border-amber-500/30 px-6 py-3 rounded-2xl font-black text-xs hover:bg-amber-600/40 transition-all">CRÉER UNE SÉQUENCE</button>
+                          </div>
+                        ) : (
+                          sequences.map(s => (
+                            <div key={s.id} className="group bg-[#1e293b]/30 border border-slate-800/60 hover:border-slate-700/80 rounded-[2rem] p-6 transition-all hover:bg-[#1e293b]/50 flex items-center gap-6">
+                              <div className="w-14 h-14 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center">
+                                <Network size={28} />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-3">
-                                  {c.sequence_id && (
-                                    <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1">
-                                      <Network size={12} /> Séquence
-                                    </span>
-                                  )}
-                                  <h3 className="font-black text-white text-lg truncate pr-4">{c.name}</h3>
-                                  <span className={cn(
-                                    "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                                    c.status === 'completed' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
-                                    c.status === 'scheduled' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : 
-                                    c.status === 'running' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-slate-800 text-slate-500 border-slate-700"
-                                  )}>{c.status}</span>
-                                </div>
-                                <p className="text-xs text-slate-500 mt-1 font-medium italic">
-                                  {c.status === 'scheduled' ? `Planifié pour le ${new Date(c.scheduled_at!).toLocaleString('fr-FR')}` : `Diffusé ${formatRelativeDate(c.created_at)}`} 
-                                  • {c.total_recipients} cibles
+                                <h3 className="font-black text-white text-lg truncate">{s.name}</h3>
+                                <p className="text-xs text-slate-500 mt-1 font-medium">
+                                  Programme: <span className="text-slate-300 font-bold">{s.programme_nom}</span> • 
+                                  Créé le {new Date(s.created_at).toLocaleDateString()} • 
+                                  {s.steps?.length || 0} étapes
                                 </p>
                               </div>
-                              
-                              <div className="hidden md:flex items-center gap-8">
-                                <div className="text-right">
-                                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">
-                                    {c.status === 'running' ? 'En cours' : 'Succès'}
-                                  </p>
-                                  <p className={cn(
-                                    "text-lg font-black",
-                                    c.status === 'running' ? "text-blue-400" : "text-emerald-400"
-                                  )}>
-                                    {c.status === 'running'
-                                      ? `${c.sent_count + c.failed_count} / ${c.total_recipients}`
-                                      : `${(c.sent_count / (c.total_recipients || 1) * 100).toFixed(0)}%`}
-                                  </p>
-                                </div>
-                                <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
-                                  <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${(c.delivered_count / (c.total_recipients || 1)) * 100}%` }} />
-                                  <div className="bg-rose-500/60 h-full transition-all duration-1000" style={{ width: `${(c.failed_count / (c.total_recipients || 1)) * 100}%` }} />
-                                </div>
-                              </div>
-
                               <div className="flex items-center gap-2">
-                                {c.status === 'scheduled' && (
-                                  <button 
-                                    onClick={() => handleEdit(c)}
-                                    className="p-3 bg-slate-800 hover:bg-amber-600 text-slate-400 hover:text-white rounded-xl transition-all"
-                                    title="Modifier la planification"
-                                  >
-                                    <Clock size={18} />
-                                  </button>
-                                )}
                                 <button 
-                                  onClick={() => deleteCampaign(c.id)}
+                                  onClick={() => handleEditSequence(s)}
+                                  className="p-3 bg-slate-800 hover:bg-amber-600 text-slate-400 hover:text-white rounded-xl transition-all"
+                                  title="Modifier la séquence"
+                                >
+                                  <Plus size={18} />
+                                </button>
+                                <button 
+                                  onClick={() => deleteSequence(s.id)}
                                   className="p-3 bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white rounded-xl transition-all"
-                                  title="Supprimer l'historique"
+                                  title="Supprimer la séquence"
                                 >
                                   <Trash2 size={18} />
                                 </button>
-                                <button 
-                                  onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                                  className={cn(
-                                    "p-3 rounded-xl transition-all",
-                                    expandedId === c.id ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-500 hover:text-white"
-                                  )}
-                                >
-                                  <ChevronRight size={20} className={cn("transition-transform", expandedId === c.id ? "rotate-90" : "")} />
-                                </button>
                               </div>
                             </div>
-                            
-                            {/* Detailed Info Reveal */}
-                            <AnimatePresence>
-                              {expandedId === c.id && (
-                                <motion.div 
-                                  initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                                  className="overflow-hidden bg-[#1e293b]/10 border-x border-b border-slate-800/40 rounded-b-[2rem] mx-8"
-                                >
-                                  <div className="p-8 space-y-6">
-                                    <div className="flex items-start gap-8">
-                                      <div className="flex-1 space-y-2">
-                                        <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest">Contenu du message</p>
-                                        <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/50 text-sm text-slate-400 whitespace-pre-wrap leading-relaxed font-mono">
-                                          {c.body}
-                                        </div>
-                                      </div>
-                                      <div className="w-48 space-y-4">
-                                        <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest text-right">Performances</p>
-                                        <div className="grid grid-cols-1 gap-2">
-                                          <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex justify-between items-center">
-                                            <span className="text-[10px] text-slate-500 font-bold uppercase">Livrés</span>
-                                            <span className="text-sm font-black text-emerald-400">{c.delivered_count}</span>
+                          ))
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {campaigns.length === 0 ? (
+                          <div className="bg-[#1e293b]/20 border border-dashed border-slate-800 rounded-[3rem] p-20 text-center space-y-6">
+                            <div className="w-24 h-24 bg-slate-800/40 rounded-full flex items-center justify-center mx-auto transition-transform hover:scale-110">
+                              <Send size={40} className="text-slate-600" />
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-slate-400 font-black uppercase tracking-widest text-sm">Le silence est d'or</p>
+                              <p className="text-slate-600 text-sm max-w-xs mx-auto font-medium">Votre historique de diffusion est vide. Prêt à faire du bruit ?</p>
+                            </div>
+                            <button onClick={() => setShowCreate(true)} className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-6 py-3 rounded-2xl font-black text-xs hover:bg-blue-600/40 transition-all">CRÉER MA PREMIÈRE CAMPAGNE</button>
+                          </div>
+                        ) : (
+                          campaigns.map(c => (
+                            <div key={c.id} className="flex flex-col">
+                              <div className="group bg-[#1e293b]/30 border border-slate-800/60 hover:border-slate-700/80 rounded-[2rem] p-6 transition-all hover:bg-[#1e293b]/50 flex items-center gap-6">
+                                <div className={cn(
+                                  "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
+                                  c.status === 'completed' ? "bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white" :
+                                  c.status === 'scheduled' ? "bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-white" :
+                                  c.status === 'running' ? "bg-blue-500/10 text-blue-400 animate-pulse" :
+                                  "bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white"
+                                )}>
+                                  {c.status === 'scheduled' ? <Clock size={28} /> :
+                                   c.status === 'running' ? <Loader2 size={28} className="animate-spin" /> :
+                                   <Target size={28} />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-3">
+                                    {c.sequence_id && (
+                                      <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1">
+                                        <Network size={12} /> Séquence
+                                      </span>
+                                    )}
+                                    <h3 className="font-black text-white text-lg truncate pr-4">{c.name}</h3>
+                                    <span className={cn(
+                                      "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                                      c.status === 'completed' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
+                                      c.status === 'scheduled' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : 
+                                      c.status === 'running' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-slate-800 text-slate-500 border-slate-700"
+                                    )}>{c.status}</span>
+                                  </div>
+                                  <p className="text-xs text-slate-500 mt-1 font-medium italic">
+                                    {c.status === 'scheduled' ? `Planifié pour le ${new Date(c.scheduled_at!).toLocaleString('fr-FR')}` : `Diffusé ${formatRelativeDate(c.created_at)}`} 
+                                    • {c.total_recipients} cibles
+                                  </p>
+                                </div>
+                                
+                                <div className="hidden md:flex items-center gap-8">
+                                  <div className="text-right">
+                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">
+                                      {c.status === 'running' ? 'En cours' : 'Succès'}
+                                    </p>
+                                    <p className={cn(
+                                      "text-lg font-black",
+                                      c.status === 'running' ? "text-blue-400" : "text-emerald-400"
+                                    )}>
+                                      {c.status === 'running'
+                                        ? `${c.sent_count + c.failed_count} / ${c.total_recipients}`
+                                        : `${(c.sent_count / (c.total_recipients || 1) * 100).toFixed(0)}%`}
+                                    </p>
+                                  </div>
+                                  <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
+                                    <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${(c.delivered_count / (c.total_recipients || 1)) * 100}%` }} />
+                                    <div className="bg-rose-500/60 h-full transition-all duration-1000" style={{ width: `${(c.failed_count / (c.total_recipients || 1)) * 100}%` }} />
+                                  </div>
+                                </div>
+  
+                                <div className="flex items-center gap-2">
+                                  {c.status === 'scheduled' && (
+                                    <button 
+                                      onClick={() => handleEdit(c)}
+                                      className="p-3 bg-slate-800 hover:bg-amber-600 text-slate-400 hover:text-white rounded-xl transition-all"
+                                      title="Modifier la planification"
+                                    >
+                                      <Clock size={18} />
+                                    </button>
+                                  )}
+                                  <button 
+                                    onClick={() => deleteCampaign(c.id)}
+                                    className="p-3 bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white rounded-xl transition-all"
+                                    title="Supprimer l'historique"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                  <button 
+                                    onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                                    className={cn(
+                                      "p-3 rounded-xl transition-all",
+                                      expandedId === c.id ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-500 hover:text-white"
+                                    )}
+                                  >
+                                    <ChevronRight size={20} className={cn("transition-transform", expandedId === c.id ? "rotate-90" : "")} />
+                                  </button>
+                                </div>
+                              </div>
+  
+                              <AnimatePresence>
+                                {expandedId === c.id && (
+                                  <motion.div 
+                                    initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden bg-[#1e293b]/10 border-x border-b border-slate-800/40 rounded-b-[2rem] mx-8"
+                                  >
+                                    <div className="p-8 space-y-6">
+                                      <div className="flex items-start gap-8">
+                                        <div className="flex-1 space-y-2">
+                                          <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest">Contenu du message</p>
+                                          <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/50 text-sm text-slate-400 whitespace-pre-wrap leading-relaxed font-mono">
+                                            {c.body}
                                           </div>
-                                          <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex justify-between items-center">
-                                            <span className="text-[10px] text-slate-500 font-bold uppercase">Échoués</span>
-                                            <span className="text-sm font-black text-rose-500">{c.failed_count}</span>
+                                        </div>
+                                        <div className="w-48 space-y-4">
+                                          <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest text-right">Performances</p>
+                                          <div className="grid grid-cols-1 gap-2">
+                                            <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex justify-between items-center">
+                                              <span className="text-[10px] text-slate-500 font-bold uppercase">Livrés</span>
+                                              <span className="text-sm font-black text-emerald-400">{c.delivered_count}</span>
+                                            </div>
+                                            <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex justify-between items-center">
+                                              <span className="text-[10px] text-slate-500 font-bold uppercase">Échoués</span>
+                                              <span className="text-sm font-black text-rose-500">{c.failed_count}</span>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
                                     </div>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        ))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          ))
+                        )}
                       </div>
                     )}
                   </motion.div>

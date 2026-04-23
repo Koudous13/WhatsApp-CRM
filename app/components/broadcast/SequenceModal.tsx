@@ -12,9 +12,10 @@ interface SequenceModalProps {
     onClose: () => void
     programmes: Programme[]
     onSuccess: () => void
+    editingSequence?: any
 }
 
-export default function SequenceModal({ onClose, programmes, onSuccess }: SequenceModalProps) {
+export default function SequenceModal({ onClose, programmes, onSuccess, editingSequence }: SequenceModalProps) {
     const [name, setName] = useState('')
     const [programmeNom, setProgrammeNom] = useState('')
     const [startDate, setStartDate] = useState('')
@@ -27,6 +28,19 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
     const [fetchingTags, setFetchingTags] = useState(false)
 
     const supabase = createClient()
+
+    useEffect(() => {
+        if (editingSequence) {
+            setName(editingSequence.name || '')
+            setProgrammeNom(editingSequence.programme_nom || '')
+            if (editingSequence.start_date) {
+                setStartDate(new Date(editingSequence.start_date).toISOString().slice(0, 16))
+            }
+            if (editingSequence.steps) {
+                setSteps(editingSequence.steps)
+            }
+        }
+    }, [editingSequence])
 
     useEffect(() => {
         if (!programmeNom) {
@@ -117,8 +131,12 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
         setLoading(true)
 
         try {
-            const res = await fetch('/api/broadcast/sequence/create', {
-                method: 'POST',
+            const url = editingSequence 
+                ? `/api/broadcast/sequence/${editingSequence.id}`
+                : '/api/broadcast/sequence/create'
+            
+            const res = await fetch(url, {
+                method: editingSequence ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name,
@@ -131,7 +149,7 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
 
             const data = await res.json()
             if (!res.ok || data.error) {
-                throw new Error(data.error || 'Erreur lors de la création')
+                throw new Error(data.error || 'Erreur lors de la sauvegarde')
             }
 
             onSuccess()
@@ -344,7 +362,7 @@ export default function SequenceModal({ onClose, programmes, onSuccess }: Sequen
                         className="bg-amber-600 hover:bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs flex items-center gap-2 shadow-xl shadow-amber-600/20 active:scale-95 transition-all"
                     >
                         {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                        CRÉER LA SÉQUENCE
+                        {editingSequence ? 'ENREGISTRER LES MODIFICATIONS' : 'CRÉER LA SÉQUENCE'}
                     </button>
                 </div>
             </motion.div>

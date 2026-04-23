@@ -16,7 +16,12 @@ export async function POST(req: NextRequest) {
         // 1. Créer la séquence
         const { data: sequence, error: seqError } = await supabase
             .from('broadcast_sequences')
-            .insert({ name, programme_nom })
+            .insert({ 
+                name, 
+                programme_nom, 
+                steps, 
+                start_date: startDate 
+            })
             .select()
             .single()
 
