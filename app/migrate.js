@@ -15,11 +15,18 @@ const sql = `
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT NOT NULL,
         programme_nom TEXT NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        steps JSONB,
+        start_date TIMESTAMPTZ
     );
+
+    ALTER TABLE broadcast_sequences ADD COLUMN IF NOT EXISTS steps JSONB;
+    ALTER TABLE broadcast_sequences ADD COLUMN IF NOT EXISTS start_date TIMESTAMPTZ;
 
     ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS sequence_id UUID REFERENCES broadcast_sequences(id) ON DELETE CASCADE;
     ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS sequence_step_index INT;
+
+    NOTIFY pgrst, 'reload_schema';
 `;
 
 async function run() {
