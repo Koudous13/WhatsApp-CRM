@@ -151,7 +151,25 @@ export async function sendAdvancedBroadcast(
 
         try {
             console.log(`[Broadcast ${campaignId}] Envoi à ${chatId} (${i + 1}/${audience.length})`);
-            await sendWhatsAppMessage(chatId, personalizedBody)
+            
+            // Tentative d'envoi avec gestion du retry sur 429
+            let attempt = 0;
+            let success = false;
+            while (attempt < 2 && !success) {
+                try {
+                    await sendWhatsAppMessage(chatId, personalizedBody)
+                    success = true;
+                } catch (sendErr: any) {
+                    if (sendErr.message.includes('429') && attempt === 0) {
+                        console.warn(`[Broadcast ${campaignId}] Rate limit hit (429), attente de 10s avant retry...`);
+                        await new Promise(r => setTimeout(r, 10000));
+                        attempt++;
+                    } else {
+                        throw sendErr;
+                    }
+                }
+            }
+
             sent++
 
             // Enregistrer le message dans l'inbox (conversation + message outbound)
@@ -193,9 +211,10 @@ export async function sendAdvancedBroadcast(
             })
             .eq('id', campaignId)
 
-        // Rate limiting anti-ban
+        // Rate limiting anti-ban (augmenté à 6s + petit jitter aléatoire pour éviter les collisions)
         if (i < audience.length - 1) {
-            await new Promise(r => setTimeout(r, 5500))
+            const jitter = Math.floor(Math.random() * 1000);
+            await new Promise(r => setTimeout(r, 6000 + jitter))
         }
     }
 
